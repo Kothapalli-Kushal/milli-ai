@@ -55,6 +55,13 @@ const _frontendPort = process.env.SYNAPSE_FRONTEND_PORT || "3000";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Pin the project root to frontend/. Without this, Next.js infers the
+  // workspace root from the repo-root package-lock.json and resolves
+  // node_modules (e.g. tailwindcss) from there, which fails.
+  outputFileTracingRoot: __dirname,
+  turbopack: {
+    root: __dirname,
+  },
   env: {
     // These are injected into every server-side page/route at runtime.
     // Route handlers can read process.env.BACKEND_URL without their own fallback.

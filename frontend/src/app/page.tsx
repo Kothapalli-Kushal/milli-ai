@@ -309,7 +309,7 @@ const TIPS = [
   {
     icon: <Sparkles className="h-5 w-5 text-purple-400" />,
     tag: 'Pro Tips',
-    title: 'Get the most from Synapse AI',
+    title: 'Get the most from Milli AI',
     desc: 'Attach images for vision tasks, switch agents mid-conversation, or orchestrate complex multi-step workflows — all from one chat interface.',
     accent: 'from-purple-500/10 to-transparent border-purple-800/40',
     tagColor: 'text-purple-400 bg-purple-950/60 border-purple-800/50',

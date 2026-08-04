@@ -1,0 +1,1 @@
+{"nodes": [{"id": "backend_requirements_coding_deps", "label": "Coding-profile extra dependencies", "file_type": "document", "source_file": "backend/requirements-coding.txt", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null, "rationale": "Extras loaded when the coding tools profile is active."}], "edges": [], "hyperedges": []}

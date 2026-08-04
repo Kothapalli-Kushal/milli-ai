@@ -1,0 +1,1 @@
+{"nodes": [{"id": "infra_prometheus_scrape_config", "label": "Prometheus scrape configuration", "file_type": "document", "source_file": "infra/prometheus.yml", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

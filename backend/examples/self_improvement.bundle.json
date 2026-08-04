@@ -1,0 +1,205 @@
+{
+    "synapse_export": true,
+    "version": "1.0",
+    "exported_at": "2026-08-03T00:00:00Z",
+    "has_python_tools": false,
+    "orchestrations": [
+        {
+            "id": "orch_self_improve_gated",
+            "name": "Self-Improvement (Human-Gated)",
+            "description": "Analyze an agent's traces, propose targeted config edits, pause for your approval, apply the accepted diff as a new version, then benchmark it. Configure the target on the Analyze step and a benchmark suite on the Benchmark step before running.",
+            "avatar": "default",
+            "entry_step_id": "s_analyze",
+            "trigger": "manual",
+            "max_total_turns": 100,
+            "timeout_minutes": 60,
+            "state_schema": {
+                "improve_mode": {
+                    "type": "string",
+                    "default": "human",
+                    "description": "Improvement mode: human (review required) or autonomous."
+                }
+            },
+            "steps": [
+                {
+                    "id": "s_analyze",
+                    "name": "Analyze Traces",
+                    "type": "improve_analyze",
+                    "improve_target_id": null,
+                    "improve_target_kind": "agent",
+                    "output_key": "insights",
+                    "next_step_id": "s_propose",
+                    "position_x": -600,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_propose",
+                    "name": "Propose Diff",
+                    "type": "improve_propose",
+                    "output_key": "proposed_diff",
+                    "next_step_id": "s_review",
+                    "position_x": -350,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_review",
+                    "name": "Review & Approve",
+                    "type": "improve_review",
+                    "output_key": "improve_review",
+                    "next_step_id": "s_apply",
+                    "position_x": -100,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_apply",
+                    "name": "Apply as New Version",
+                    "type": "improve_apply",
+                    "output_key": "apply_result",
+                    "next_step_id": "s_benchmark",
+                    "position_x": 150,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_benchmark",
+                    "name": "Benchmark New Version",
+                    "type": "benchmark",
+                    "benchmark_id": null,
+                    "benchmark_record_as": "new",
+                    "output_key": "new_score",
+                    "next_step_id": "s_end",
+                    "position_x": 400,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_end",
+                    "name": "Done",
+                    "type": "end",
+                    "position_x": 650,
+                    "position_y": 0
+                }
+            ]
+        },
+        {
+            "id": "orch_self_improve_ratchet",
+            "name": "Self-Improvement (Autonomous Ratchet)",
+            "description": "Unattended improvement loop: benchmark(baseline) -> analyze -> propose -> apply -> benchmark(new) -> ratchet decide (keep or auto-revert), looping until the iteration cap, plateau patience, wallclock, or LLM budget fires. Every apply/revert lands in the Self-Improvement Inbox. Configure the target on the Analyze step and a benchmark suite on both Benchmark steps before running.",
+            "avatar": "default",
+            "entry_step_id": "s_bench_base",
+            "trigger": "manual",
+            "max_total_turns": 200,
+            "timeout_minutes": 60,
+            "state_schema": {
+                "improve_mode": {
+                    "type": "string",
+                    "default": "autonomous",
+                    "description": "Improvement mode: autonomous skips the review step and enables ratchet safeguards."
+                },
+                "improve_budget_usd": {
+                    "type": "number",
+                    "default": 5.0,
+                    "description": "Per-run LLM spend cap; the loop aborts (with an inbox entry) on exceed."
+                }
+            },
+            "steps": [
+                {
+                    "id": "s_bench_base",
+                    "name": "Benchmark Baseline",
+                    "type": "benchmark",
+                    "benchmark_id": null,
+                    "benchmark_record_as": "baseline",
+                    "output_key": "baseline_score",
+                    "next_step_id": "s_analyze",
+                    "max_iterations": 20,
+                    "position_x": -800,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_analyze",
+                    "name": "Analyze Traces",
+                    "type": "improve_analyze",
+                    "improve_target_id": null,
+                    "improve_target_kind": "agent",
+                    "output_key": "insights",
+                    "next_step_id": "s_propose",
+                    "max_iterations": 20,
+                    "position_x": -550,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_propose",
+                    "name": "Propose Diff",
+                    "type": "improve_propose",
+                    "output_key": "proposed_diff",
+                    "next_step_id": "s_review",
+                    "max_iterations": 20,
+                    "position_x": -300,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_review",
+                    "name": "Review (skipped when autonomous)",
+                    "type": "improve_review",
+                    "output_key": "improve_review",
+                    "next_step_id": "s_apply",
+                    "max_iterations": 20,
+                    "position_x": -50,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_apply",
+                    "name": "Apply as New Version",
+                    "type": "improve_apply",
+                    "output_key": "apply_result",
+                    "next_step_id": "s_bench_new",
+                    "max_iterations": 20,
+                    "position_x": 200,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_bench_new",
+                    "name": "Benchmark New Version",
+                    "type": "benchmark",
+                    "benchmark_id": null,
+                    "benchmark_record_as": "new",
+                    "output_key": "new_score",
+                    "next_step_id": "s_ratchet",
+                    "max_iterations": 20,
+                    "position_x": 450,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_ratchet",
+                    "name": "Ratchet Decide",
+                    "type": "improve_ratchet_decide",
+                    "input_keys": ["baseline_score", "new_score"],
+                    "ratchet_threshold": 0.0,
+                    "ratchet_plateau_patience": 2,
+                    "ratchet_max_iterations": 5,
+                    "output_key": "ratchet",
+                    "next_step_id": "s_gate",
+                    "max_iterations": 20,
+                    "position_x": 700,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_gate",
+                    "name": "Continue or Stop?",
+                    "type": "if_else",
+                    "if_condition": "state.ratchet_stop == True",
+                    "if_true_step_id": "s_end",
+                    "if_false_step_id": "s_bench_base",
+                    "max_iterations": 20,
+                    "position_x": 950,
+                    "position_y": 0
+                },
+                {
+                    "id": "s_end",
+                    "name": "Done",
+                    "type": "end",
+                    "position_x": 1200,
+                    "position_y": 0
+                }
+            ]
+        }
+    ]
+}

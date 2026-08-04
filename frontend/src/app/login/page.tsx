@@ -42,7 +42,7 @@ function LoginForm() {
         <div className="min-h-screen bg-black flex items-center justify-center px-4">
             <div className="w-full max-w-sm space-y-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-white tracking-tight">Synapse AI</h1>
+                    <h1 className="text-2xl font-bold text-white tracking-tight">Milli AI</h1>
                     <p className="text-zinc-500 text-sm mt-1">Sign in to continue</p>
                 </div>
 

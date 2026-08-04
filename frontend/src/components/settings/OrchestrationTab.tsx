@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Save, Play, Trash, Square, Loader2, Copy, Check, Radio, Bot, Scale, GitBranch, GitMerge, RefreshCw, User, Code, Zap, Wrench, ExternalLink, X, Sparkles, Braces, GitFork, ArrowLeftRight, FileText } from 'lucide-react';
+import { Plus, Save, Play, Trash, Square, Loader2, Copy, Check, Radio, Bot, Scale, GitBranch, GitMerge, RefreshCw, User, Code, Zap, Wrench, ExternalLink, X, Sparkles, Braces, GitFork, ArrowLeftRight, FileText, ScanSearch, Lightbulb, UserCheck, CheckCheck, FlaskConical, TrendingUp } from 'lucide-react';
 import { BuilderPanel } from '../orchestration/BuilderPanel';
 import { STEP_TYPE_META } from '@/types/orchestration';
 import { readWithStallTimeout } from '@/lib/sse';
@@ -15,6 +15,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ConfirmationModal } from './ConfirmationModal';
 import { ToastNotification } from './ToastNotification';
+import { InsightsPanel } from '@/components/improve/InsightsPanel';
+import { DiffReview } from '@/components/improve/DiffReview';
+import { VersionHistory } from '@/components/improve/VersionHistory';
+import { BenchmarkEditor } from '@/components/improve/BenchmarkEditor';
+import { InboxPanel } from '@/components/improve/InboxPanel';
 
 type ToolCallLogEntry = { kind: 'tool_call'; tool_name: string; args: Record<string, any>; step_name?: string };
 type ToolResultLogEntry = { kind: 'tool_result'; tool_name: string; preview: string };
@@ -61,6 +66,8 @@ const STEP_ICONS: Record<StepType, React.FC<{ size?: number }>> = {
     llm: Zap, agent: Bot, tool: Wrench, evaluator: Scale, parallel: GitBranch,
     merge: GitMerge, loop: RefreshCw, human: User, transform: Code,
     extract_json: Braces, if_else: GitFork, switch: ArrowLeftRight, print: FileText, end: Square,
+    improve_analyze: ScanSearch, improve_propose: Lightbulb, improve_review: UserCheck,
+    improve_apply: CheckCheck, benchmark: FlaskConical, improve_ratchet_decide: TrendingUp,
 };
 
 const EMPTY_ORCHESTRATION: Orchestration = {
@@ -119,6 +126,13 @@ export function OrchestrationTab() {
     const [humanPrompt, setHumanPrompt] = useState<string | null>(null);
     const [humanContext, setHumanContext] = useState<string | null>(null);
     const [humanResponse, setHumanResponse] = useState('');
+    // Structured fields for the paused human step (dropdowns, text inputs).
+    // When present, submitHumanInput sends a dict keyed by field name (and
+    // duplicated under the field's label) so orch conditions like
+    // `state.human_gate["Your decision"] == "yes"` resolve correctly.
+    type HumanField = { name: string; type: string; label: string; options?: string[] };
+    const [humanFields, setHumanFields] = useState<HumanField[] | null>(null);
+    const [humanFieldValues, setHumanFieldValues] = useState<Record<string, string>>({});
     const abortRef = useRef<AbortController | null>(null);
     // Mirrors `runId` so the streamSSE catch / wake handler can read the live run
     // id without a stale closure. Timestamp of the last byte (incl. heartbeats)
@@ -204,6 +218,8 @@ export function OrchestrationTab() {
         setRunStatus(runInfo.status as 'running' | 'paused' | 'completed' | 'failed' | 'cancelled');
         setHumanPrompt(null);
         setHumanContext(null);
+        setHumanFields(null);
+        setHumanFieldValues({});
 
         // Baseline: mark all steps pending (like a fresh run) before overlaying
         // completed/failed from the checkpoint.
@@ -226,6 +242,10 @@ export function OrchestrationTab() {
                 if (data.waiting_for_human && data.human_prompt) {
                     setHumanPrompt(data.human_prompt);
                     setHumanContext(data.human_context || null);
+                    if (Array.isArray(data.human_fields) && data.human_fields.length > 0) {
+                        setHumanFields(data.human_fields);
+                        setHumanFieldValues({});
+                    }
                 }
             }
         } catch { /* ignore */ }
@@ -526,6 +546,10 @@ export function OrchestrationTab() {
                     if (data.waiting_for_human && data.human_prompt) {
                         setHumanPrompt(data.human_prompt);
                         setHumanContext(data.human_context || null);
+                        if (Array.isArray(data.human_fields) && data.human_fields.length > 0) {
+                            setHumanFields(data.human_fields);
+                            setHumanFieldValues({});
+                        }
                     }
                     setRunLog(prev => [...prev, '[Reconnected — run is waiting for your input]']);
                     return;
@@ -711,6 +735,13 @@ export function OrchestrationTab() {
                 if (data.orch_step_id) setRunStepStatuses(prev => ({ ...prev, [data.orch_step_id]: 'paused' }));
                 setHumanPrompt(data.prompt || 'Please provide input:');
                 setHumanContext(data.agent_context || null);
+                if (Array.isArray(data.fields) && data.fields.length > 0) {
+                    setHumanFields(data.fields);
+                    setHumanFieldValues({});
+                } else {
+                    setHumanFields(null);
+                    setHumanFieldValues({});
+                }
                 setRunLog(prev => [...prev, `⏸ Waiting for human input...`]);
                 break;
 
@@ -783,8 +814,18 @@ export function OrchestrationTab() {
 
     const submitHumanInput = async () => {
         if (!runId) return;
+        // Build the response payload BEFORE clearing state (React state updates
+        // are async — reading humanFields after setHumanFields(null) sees the
+        // old value in this closure, but relying on that is fragile).
+        const fields = humanFields;
+        const fieldValues = humanFieldValues;
+        const textResponse = humanResponse;
+
         setHumanPrompt(null);
         setHumanContext(null);
+        setHumanFields(null);
+        setHumanFieldValues({});
+        setHumanResponse('');
         setRunStatus('running');
         setRunStepStatuses(prev => {
             const next = { ...prev };
@@ -792,10 +833,26 @@ export function OrchestrationTab() {
             return next;
         });
         setRunLog(prev => [...prev, `Human response submitted`]);
-        const response = humanResponse;
-        setHumanResponse('');
 
-        streamSSE(`/api/orchestrations/runs/${runId}/human-input`, { response });
+        // When the paused step declared human_fields, send a structured dict
+        // keyed by BOTH field.name and field.label so downstream if_else
+        // conditions can index either way (e.g. `state.gate.decision` OR
+        // `state.gate["Your decision"]`). When there are no fields, keep the
+        // legacy `{response: "<text>"}` shape.
+        let payload: { response: unknown };
+        if (fields && fields.length > 0) {
+            const dict: Record<string, string> = {};
+            for (const f of fields) {
+                const v = fieldValues[f.name] ?? '';
+                if (f.name) dict[f.name] = v;
+                if (f.label && f.label !== f.name) dict[f.label] = v;
+            }
+            payload = { response: dict };
+        } else {
+            payload = { response: textResponse };
+        }
+
+        streamSSE(`/api/orchestrations/runs/${runId}/human-input`, payload);
     };
 
     const resumeRun = async () => {
@@ -992,22 +1049,24 @@ export function OrchestrationTab() {
                     </div>
 
                     {/* Step type toolbar */}
-                    <div className="flex items-center gap-1 px-4 py-2 border-b border-zinc-800 shrink-0">
-                        <span className="text-xs text-zinc-500 mr-2">Add step:</span>
-                        {(['llm', 'agent', 'tool', 'evaluator', 'parallel', 'merge', 'loop', 'human', 'transform', 'extract_json', 'if_else', 'switch', 'print', 'end'] as StepType[]).map(type => {
-                            const meta = STEP_TYPE_META[type];
-                            const Icon = STEP_ICONS[type];
-                            return (
-                                <button
-                                    key={type}
-                                    onClick={() => addStep(type)}
-                                    className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors capitalize"
-                                >
-                                    <Icon size={12} />
-                                    {meta.label}
-                                </button>
-                            );
-                        })}
+                    <div className="flex items-center gap-1 px-4 py-2 border-b border-zinc-800 shrink-0 min-w-0">
+                        <span className="text-xs text-zinc-500 mr-2 shrink-0">Add step:</span>
+                        <div className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0 pb-1">
+                            {(['llm', 'agent', 'tool', 'evaluator', 'parallel', 'merge', 'loop', 'human', 'transform', 'extract_json', 'if_else', 'switch', 'print', 'end', 'improve_analyze', 'improve_propose', 'improve_review', 'improve_apply', 'benchmark', 'improve_ratchet_decide'] as StepType[]).map(type => {
+                                const meta = STEP_TYPE_META[type];
+                                const Icon = STEP_ICONS[type];
+                                return (
+                                    <button
+                                        key={type}
+                                        onClick={() => addStep(type)}
+                                        className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors capitalize shrink-0 whitespace-nowrap"
+                                    >
+                                        <Icon size={12} />
+                                        {meta.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {/* Main content: canvas + optional side panel */}
@@ -1056,6 +1115,9 @@ export function OrchestrationTab() {
                             humanContext={humanContext}
                             humanResponse={humanResponse}
                             setHumanResponse={setHumanResponse}
+                            humanFields={humanFields}
+                            humanFieldValues={humanFieldValues}
+                            setHumanFieldValues={setHumanFieldValues}
                             onSubmitHuman={submitHumanInput}
                             onOpenResponseModal={setResponseModal}
                             runId={runId}
@@ -1255,7 +1317,9 @@ function ResponseModal({ stepName, stepType, content, onClose }: { stepName: str
 // --- Bottom panel with collapsible sections ---
 function BottomPanel({
     draft, setDraft, runStatus, runLog, runInput, setRunInput, onStartRun,
-    humanPrompt, humanContext, humanResponse, setHumanResponse, onSubmitHuman, onOpenResponseModal,
+    humanPrompt, humanContext, humanResponse, setHumanResponse,
+    humanFields, humanFieldValues, setHumanFieldValues,
+    onSubmitHuman, onOpenResponseModal,
     runId, onResumeRun, pastRuns, onRestoreRun,
 }: {
     draft: Orchestration;
@@ -1269,6 +1333,9 @@ function BottomPanel({
     humanContext: string | null;
     humanResponse: string;
     setHumanResponse: (v: string) => void;
+    humanFields: { name: string; type: string; label: string; options?: string[] }[] | null;
+    humanFieldValues: Record<string, string>;
+    setHumanFieldValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
     onSubmitHuman: () => void;
     onOpenResponseModal: (entry: { step_name: string; step_type?: string; content: string }) => void;
     runId: string | null;
@@ -1276,7 +1343,8 @@ function BottomPanel({
     pastRuns: { run_id: string; orchestration_id: string; status: string; started_at?: string; ended_at?: string }[];
     onRestoreRun: (run: { run_id: string; orchestration_id: string; status: string }) => void;
 }) {
-    const [activeSection, setActiveSection] = useState<'state' | 'guardrails' | 'run' | 'recent'>('run');
+    const [activeSection, setActiveSection] = useState<'state' | 'guardrails' | 'run' | 'recent' | 'improve'>('run');
+    const [improveRefreshKey, setImproveRefreshKey] = useState(0);
     const [panelHeight, setPanelHeight] = useState(280);
     const [humanContextHeight, setHumanContextHeight] = useState(200);
     const logRef = useRef<HTMLDivElement>(null);
@@ -1372,6 +1440,16 @@ function BottomPanel({
                         </span>
                     )}
                 </button>
+                <button
+                    onClick={() => setActiveSection('improve')}
+                    className={`px-4 py-2 text-xs font-medium transition-colors ${
+                        activeSection === 'improve'
+                            ? 'text-blue-400 border-b-2 border-blue-400'
+                            : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                >
+                    Self-Improve
+                </button>
             </div>
 
             <div className="p-4 flex-1 overflow-y-auto min-h-0">
@@ -1381,6 +1459,34 @@ function BottomPanel({
                         schema={draft.state_schema}
                         onChange={(schema) => setDraft({ ...draft, state_schema: schema })}
                     />
+                )}
+
+                {/* Self-Improve (Checkpoint 3 — insights, diff review, versions) */}
+                {activeSection === 'improve' && (
+                    draft.id ? (
+                        <div className="space-y-6">
+                            <InsightsPanel targetId={draft.id} targetKind="orchestration" />
+                            <DiffReview
+                                targetId={draft.id}
+                                targetKind="orchestration"
+                                onApplied={() => setImproveRefreshKey(k => k + 1)}
+                            />
+                            <BenchmarkEditor
+                                targetId={draft.id}
+                                targetKind="orchestration"
+                                onRan={() => setImproveRefreshKey(k => k + 1)}
+                            />
+                            <VersionHistory
+                                targetId={draft.id}
+                                targetKind="orchestration"
+                                refreshKey={improveRefreshKey}
+                                onRolledBack={() => setImproveRefreshKey(k => k + 1)}
+                            />
+                            <InboxPanel objectId={draft.id} />
+                        </div>
+                    ) : (
+                        <p className="text-xs text-zinc-600">Save this orchestration first — self-improvement works on saved orchestrations with recorded runs.</p>
+                    )
                 )}
 
                 {/* Guardrails */}
@@ -1515,16 +1621,56 @@ function BottomPanel({
                                     >{humanPrompt}</ReactMarkdown>
                                 </div>
                                 <div className="flex gap-2">
-                                    <input
-                                        className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-xs text-zinc-200 outline-none"
-                                        value={humanResponse}
-                                        onChange={(e) => setHumanResponse(e.target.value)}
-                                        placeholder="Your response..."
-                                        onKeyDown={(e) => { if (e.key === 'Enter') onSubmitHuman(); }}
-                                    />
+                                    {humanFields && humanFields.length > 0 ? (
+                                        <div className="flex-1 space-y-2">
+                                            {humanFields.map((field, idx) => {
+                                                const key = field.name || `field_${idx}`;
+                                                const value = humanFieldValues[key] ?? '';
+                                                const isOptions = (field.type === 'options' || field.type === 'select') && Array.isArray(field.options) && field.options.length > 0;
+                                                return (
+                                                    <div key={key} className="space-y-1">
+                                                        <label className="block text-[11px] text-amber-200">{field.label || field.name}</label>
+                                                        {isOptions ? (
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {field.options!.map(opt => {
+                                                                    const active = value === opt;
+                                                                    return (
+                                                                        <button
+                                                                            key={opt}
+                                                                            type="button"
+                                                                            onClick={() => setHumanFieldValues(prev => ({ ...prev, [key]: opt }))}
+                                                                            className={`px-2 py-1 text-[11px] rounded border ${active ? 'bg-amber-600 border-amber-500 text-white' : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500'}`}
+                                                                        >
+                                                                            {opt}
+                                                                        </button>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        ) : (
+                                                            <input
+                                                                className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-xs text-zinc-200 outline-none"
+                                                                value={value}
+                                                                onChange={(e) => setHumanFieldValues(prev => ({ ...prev, [key]: e.target.value }))}
+                                                                placeholder={field.label || field.name}
+                                                                onKeyDown={(e) => { if (e.key === 'Enter') onSubmitHuman(); }}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <input
+                                            className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-xs text-zinc-200 outline-none"
+                                            value={humanResponse}
+                                            onChange={(e) => setHumanResponse(e.target.value)}
+                                            placeholder="Your response..."
+                                            onKeyDown={(e) => { if (e.key === 'Enter') onSubmitHuman(); }}
+                                        />
+                                    )}
                                     <button
                                         onClick={onSubmitHuman}
-                                        className="px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded"
+                                        className="px-3 py-1.5 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded self-start"
                                     >
                                         Submit
                                     </button>

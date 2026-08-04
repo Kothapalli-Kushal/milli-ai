@@ -25,7 +25,7 @@ interface StepConfigPanelProps {
     availableModels?: string[];
 }
 
-const STEP_TYPES: StepType[] = ['agent', 'llm', 'tool', 'evaluator', 'parallel', 'merge', 'loop', 'human', 'transform', 'extract_json', 'if_else', 'switch', 'print', 'end'];
+const STEP_TYPES: StepType[] = ['agent', 'llm', 'tool', 'evaluator', 'parallel', 'merge', 'loop', 'human', 'transform', 'extract_json', 'if_else', 'switch', 'print', 'end', 'improve_analyze', 'improve_propose', 'improve_review', 'improve_apply', 'benchmark', 'improve_ratchet_decide'];
 
 export function StepConfigPanel({ step, agents, allStepIds, onUpdate, onDelete, onClose, isEntry, onSetEntry, availableModels }: StepConfigPanelProps) {
     const update = (patch: Partial<StepConfig>) => onUpdate({ ...step, ...patch });
@@ -369,6 +369,122 @@ export function StepConfigPanel({ step, agents, allStepIds, onUpdate, onDelete, 
                 {/* ===== SWITCH config ===== */}
                 {step.type === 'switch' && (
                     <SwitchStepConfig step={step} update={update} otherSteps={otherSteps} inputCls={inputCls} selectCls={selectCls} />
+                )}
+
+                {/* ===== IMPROVE: ANALYZE / PROPOSE config ===== */}
+                {(step.type === 'improve_analyze' || step.type === 'improve_propose') && (
+                    <div className="space-y-2">
+                        <div className="rounded bg-sky-950/40 border border-sky-800/40 px-3 py-2 text-[10px] text-sky-400 leading-relaxed">
+                            {step.type === 'improve_analyze'
+                                ? <><strong>Improve: Analyze</strong> — runs the trace detectors on the target and writes insights to the output key. Downstream improve steps inherit the target automatically.</>
+                                : <><strong>Improve: Propose</strong> — calls the tuner on the latest insights and writes a ProposedDiff + <code>improve_run_id</code> to shared state.</>}
+                        </div>
+                        {step.type === 'improve_analyze' && (
+                            <>
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Target Kind</label>
+                                    <select className={selectCls} value={step.improve_target_kind || 'agent'} onChange={(e) => update({ improve_target_kind: e.target.value as 'agent' | 'orchestration' })}>
+                                        <option value="agent">Agent</option>
+                                        <option value="orchestration">Orchestration</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Target</label>
+                                    {(step.improve_target_kind || 'agent') === 'agent' ? (
+                                        <select className={selectCls} value={step.improve_target_id || ''} onChange={(e) => update({ improve_target_id: e.target.value || undefined })}>
+                                            <option value="">Select agent...</option>
+                                            {agents.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                                        </select>
+                                    ) : (
+                                        <input className={inputSmCls} value={step.improve_target_id || ''} onChange={(e) => update({ improve_target_id: e.target.value || undefined })} placeholder="orch_..." />
+                                    )}
+                                </div>
+                            </>
+                        )}
+                        {step.type === 'improve_propose' && (
+                            <>
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Tuner Model <span className="text-zinc-600 normal-case">(override)</span></label>
+                                    <select className={selectCls} value={step.model || ''} onChange={(e) => update({ model: e.target.value || undefined })}>
+                                        <option value="">(Workspace default)</option>
+                                        {(availableModels || []).map((m) => (
+                                            <option key={m} value={m}>{m}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">LLM Budget (USD, per run)</label>
+                                    <input type="number" step="0.01" min="0" className={inputSmCls} value={step.improve_budget_usd ?? ''} onChange={(e) => update({ improve_budget_usd: e.target.value === '' ? null : parseFloat(e.target.value) })} placeholder="(no cap)" />
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
+                {/* ===== IMPROVE: REVIEW config ===== */}
+                {step.type === 'improve_review' && (
+                    <div className="space-y-2">
+                        <div className="rounded bg-rose-950/40 border border-rose-800/40 px-3 py-2 text-[10px] text-rose-400 leading-relaxed">
+                            <strong>Improve: Review</strong> — pauses the run for your approval of the proposed diff (existing human-input flow). Automatically skipped when <code>state.improve_mode</code> is <code>autonomous</code>.
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">Prompt <span className="text-zinc-600 normal-case">(optional override)</span></label>
+                            <textarea className={textareaCls} rows={3} value={step.human_prompt || ''} onChange={(e) => update({ human_prompt: e.target.value || undefined })} placeholder="Defaults to a summary of the proposed field edits" />
+                        </div>
+                    </div>
+                )}
+
+                {/* ===== IMPROVE: APPLY config ===== */}
+                {step.type === 'improve_apply' && (
+                    <div className="rounded bg-green-950/40 border border-green-800/40 px-3 py-2 text-[10px] text-green-400 leading-relaxed">
+                        <strong>Improve: Apply</strong> — snapshots the current config, applies the reviewed diff as a new version, and sets it active. Refuses to edit the orchestration it is running inside (self-edit lockout). Autonomous applies are logged to the Self-Improvement Inbox.
+                    </div>
+                )}
+
+                {/* ===== BENCHMARK config ===== */}
+                {step.type === 'benchmark' && (
+                    <div className="space-y-2">
+                        <div className="rounded bg-violet-950/40 border border-violet-800/40 px-3 py-2 text-[10px] text-violet-400 leading-relaxed">
+                            <strong>Benchmark</strong> — runs a standalone benchmark suite against the improvement target and writes the composite score to the output key.
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">Benchmark ID</label>
+                            <input className={inputSmCls} value={step.benchmark_id || ''} onChange={(e) => update({ benchmark_id: e.target.value || undefined })} placeholder="my_benchmark" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">Record As</label>
+                            <select className={selectCls} value={step.benchmark_record_as || ''} onChange={(e) => update({ benchmark_record_as: (e.target.value || null) as 'baseline' | 'new' | null })}>
+                                <option value="">(don&apos;t stamp run)</option>
+                                <option value="baseline">baseline</option>
+                                <option value="new">new</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
+
+                {/* ===== IMPROVE: RATCHET DECIDE config ===== */}
+                {step.type === 'improve_ratchet_decide' && (
+                    <div className="space-y-2">
+                        <div className="rounded bg-orange-950/40 border border-orange-800/40 px-3 py-2 text-[10px] text-orange-400 leading-relaxed">
+                            <strong>Ratchet Decide</strong> — keeps the new version when <code>new_score − baseline_score ≥ threshold</code>, otherwise auto-reverts. Writes <code>state.ratchet_stop</code> for an If/Else gate. Stops on iteration cap, plateau, wallclock, or budget — always with an inbox entry.
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">Keep Threshold (score delta)</label>
+                            <input type="number" step="0.01" className={inputSmCls} value={step.ratchet_threshold ?? 0} onChange={(e) => update({ ratchet_threshold: parseFloat(e.target.value) || 0 })} />
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">Max Iterations</label>
+                            <input type="number" min="1" className={inputSmCls} value={step.ratchet_max_iterations ?? 5} onChange={(e) => update({ ratchet_max_iterations: parseInt(e.target.value) || 5 })} />
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">Plateau Patience (consecutive reverts)</label>
+                            <input type="number" min="1" className={inputSmCls} value={step.ratchet_plateau_patience ?? 2} onChange={(e) => update({ ratchet_plateau_patience: parseInt(e.target.value) || 2 })} />
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">LLM Budget (USD, per run)</label>
+                            <input type="number" step="0.01" min="0" className={inputSmCls} value={step.improve_budget_usd ?? ''} onChange={(e) => update({ improve_budget_usd: e.target.value === '' ? null : parseFloat(e.target.value) })} placeholder="(no cap)" />
+                        </div>
+                    </div>
                 )}
 
                 <hr className="border-zinc-700" />

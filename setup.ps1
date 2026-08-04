@@ -1,4 +1,4 @@
-# Synapse AI Setup Script for Windows
+﻿# Synapse AI Setup Script for Windows
 # Run with: irm https://raw.githubusercontent.com/synapseorch-ai/synapse-ai/main/setup.ps1 | iex
 
 $ErrorActionPreference = "Stop"

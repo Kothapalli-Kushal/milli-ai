@@ -451,9 +451,13 @@ class ToolStepExecutor:
             agent_name, actual_tool_name = tool_router[tool_name]
             session = server_module.agent_sessions.get(agent_name)
             if session:
-                result = await session.call_tool(
-                    actual_tool_name, tool_args, read_timeout_seconds=timedelta(seconds=MCP_TOOL_CALL_TIMEOUT)
-                )
+                # Outer guard mirrors react_engine.py: bound the whole MCP round
+                # trip even if the transport wedges and read_timeout_seconds
+                # never fires (e.g. stdio writer blocked by a stuck server).
+                with anyio.fail_after(MCP_TOOL_CALL_TIMEOUT + 5):
+                    result = await session.call_tool(
+                        actual_tool_name, tool_args, read_timeout_seconds=timedelta(seconds=MCP_TOOL_CALL_TIMEOUT)
+                    )
                 return result.content[0].text if result.content else ""
         # Custom tools — Python or HTTP
         from core.routes.tools import load_custom_tools
@@ -1509,6 +1513,19 @@ class _DotNavigableState:
         data = object.__getattribute__(self, '_data')
         return len(data)
 
+    # Exposed so if_condition/switch expressions can inspect a dict's
+    # values without stringifying keys — important when a human step
+    # stores responses keyed by the field's label (which often contains
+    # words like "APPROVE" / "REJECT" that would otherwise leak into
+    # `str(state.foo).lower()` matches).
+    def values(self):
+        data = object.__getattribute__(self, '_data')
+        return list(data.values())
+
+    def keys(self):
+        data = object.__getattribute__(self, '_data')
+        return list(data.keys())
+
 
 # Restricted namespace for safe eval in IF/Else and Switch steps
 _SAFE_EVAL_BUILTINS = {
@@ -1684,3 +1701,14 @@ STEP_EXECUTORS = {
     StepType.PRINT: PrintStepExecutor(),
     StepType.END: EndStepExecutor(),
 }
+
+# Self-improvement executors (core/improve/steps.py) — the single permitted
+# CP5 hook (CLAUDE.md §0.4). Failure-isolated: if the improve package can't
+# load, the IMPROVE_*/BENCHMARK step types are simply unavailable.
+try:
+    from core.improve.steps import IMPROVE_STEP_EXECUTORS
+    STEP_EXECUTORS.update(
+        {StepType(k): v for k, v in IMPROVE_STEP_EXECUTORS.items()}
+    )
+except Exception:  # pragma: no cover
+    pass

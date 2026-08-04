@@ -13,12 +13,12 @@ $FrontendJob = $null
 # Cleanup function
 function Get-PythonCmd {
     if (Get-Command python3.11 -ErrorAction SilentlyContinue) { return "python3.11" }
-    $candidates = @("python3", "python", "python3.12", "python3.13")
+    $candidates = @("python3", "python", "python3.12", "python3.13", "python3.14")
     foreach ($cmd in $candidates) {
         $c = Get-Command $cmd -ErrorAction SilentlyContinue
         if ($c) {
             if ($c.Source -match "WindowsApps") { continue }
-            $out = & $cmd -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>$null
+            $out = & $cmd -c "import sys; v=sys.version_info; print(str(v.major)+'.'+str(v.minor))" 2>$null
             if ($out) {
                 try {
                     if ([version]"$out.0" -ge [version]"3.11.0") { return $cmd }

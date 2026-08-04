@@ -14,8 +14,43 @@ from .state import SharedState
 from .steps import STEP_EXECUTORS
 from .logger import OrchestrationLogger
 
+# Self-improvement trace hook (core/improve/) — failure-isolated: if the
+# module can't load, tracing degrades to a no-op and runs are unaffected.
+try:
+    from core.improve.trace_writer import begin_orchestration_trace, end_orchestration_trace
+except Exception:  # pragma: no cover
+    def begin_orchestration_trace(**kwargs):
+        class _Noop:
+            def record_event(self, event): pass
+            def close(self): pass
+        return _Noop()
+
+    def end_orchestration_trace(writer):
+        pass
+
 
 MAX_NESTED_DEPTH = 3
+
+
+def _extract_timeout(exc: BaseException) -> TimeoutError | None:
+    """Return the underlying TimeoutError if `exc` is one, or if it is an
+    ExceptionGroup (as raised by anyio/MCP on Python 3.11+) that wraps one.
+
+    anyio surfaces cancellation timeouts from task groups as
+    ExceptionGroup([TimeoutError()]), which a bare `except TimeoutError`
+    does not match — without this unwrapping, real step timeouts get
+    misreported as "An internal error occurred".
+    """
+    if isinstance(exc, TimeoutError):
+        return exc
+    if isinstance(exc, BaseExceptionGroup):
+        matches = exc.subgroup(TimeoutError)
+        if matches is not None:
+            for leaf in matches.exceptions:
+                inner = _extract_timeout(leaf)
+                if inner is not None:
+                    return inner
+    return None
 
 
 class OrchestrationEngine:
@@ -86,15 +121,26 @@ class OrchestrationEngine:
             session_id=session_id,
         )
 
-        yield {
-            "type": "orchestration_start",
-            "run_id": run_id,
-            "orchestration_id": self.orch.id,
-            "orchestration_name": self.orch.name,
-        }
+        # Checkpoint-1 hook: tee run events into a trace file (additive, no behavior change)
+        _improve_trace = begin_orchestration_trace(
+            orchestration_id=self.orch.id,
+            run_id=run_id,
+            session_id=session_id,
+            user_input=initial_input,
+        )
+        try:
+            yield {
+                "type": "orchestration_start",
+                "run_id": run_id,
+                "orchestration_id": self.orch.id,
+                "orchestration_name": self.orch.name,
+            }
 
-        async for event in self._execute_loop(run, state):
-            yield event
+            async for event in self._execute_loop(run, state):
+                _improve_trace.record_event(event)
+                yield event
+        finally:
+            end_orchestration_trace(_improve_trace)
 
     async def _execute_loop(self, run: OrchestrationRun, state: SharedState) -> AsyncGenerator[dict, None]:
         """Core execution loop — shared between run() and resume()."""
@@ -175,65 +221,73 @@ class OrchestrationEngine:
             }
 
             try:
-                # anyio.fail_after installs a cancel scope on the CURRENT task —
-                # unlike asyncio.wait_for which creates a new Task and breaks
-                # anyio-based MCP sessions (their _receive_loop wakeup never
-                # reaches a waiter in a different Task's context).
-                # This properly interrupts a stuck session.call_tool() inside
-                # the executor when the step deadline is reached.
+                # NOTE: The per-step timeout used to be enforced with
+                #     with anyio.fail_after(step_timeout):
+                #         async for event in executor.execute(...):
+                #             yield event
+                # but that installs a task-local anyio cancel scope while the
+                # outer generator suspends at each `yield event`. When any
+                # inner async generator (e.g. an MCP session's stdio reader,
+                # or run_agent_step) is finalized on a *different* task —
+                # which happens on Python 3.14 during normal teardown of
+                # backgrounded MCP tasks, and also whenever the outer SSE
+                # consumer disconnects and Python's GC runs aclose() on the
+                # abandoned generator — anyio raises
+                # "Attempted to exit cancel scope in a different task than
+                # it was entered in", masking the step's real result.
                 #
-                # IMPORTANT: never yield human_input_required inside the
-                # fail_after scope. Python's GC finalizer runs aclose() on
-                # abandoned async generators in a NEW asyncio Task; if a
-                # cancel scope is active at the suspension point, anyio raises
-                # "cancel scope in a different task". We break out of the scope
-                # cleanly (in the current task) and yield the event below.
+                # Per-step timeout enforcement is dropped here. Stuck runs
+                # are still caught by:
+                #   • the global orchestration timeout (orch.timeout_minutes)
+                #     enforced by the elapsed-time check above,
+                #   • the MCP session's own read_timeout_seconds on each
+                #     tool call,
+                #   • max_turns / max_total_turns guards.
                 human_input_event: dict | None = None
                 try:
-                    with anyio.fail_after(step_timeout):
-                        async for event in executor.execute(step, run, self):
-                            # Feed every event to the logger
+                    async for event in executor.execute(step, run, self):
+                        # Feed every event to the logger
+                        if logger:
+                            logger.log_event(event)
+
+                        # _log_ prefixed events are metadata for the logger only
+                        if event.get("type", "").startswith("_log_"):
+                            continue
+
+                        if event.get("type") == "human_input_required":
+                            run.waiting_for_human = True
+                            run.status = "paused"
+                            run.current_step_id = step.id
+                            # Track the sub-run that needs human input when the
+                            # request originated inside a nested orchestration.
+                            if event.get("nested_run_id"):
+                                run.nested_run_id = event["nested_run_id"]
+                                run.nested_orch_id = event.get("nested_orch_id")
+                            else:
+                                run.nested_run_id = None
+                                run.nested_orch_id = None
+                            state.checkpoint()
                             if logger:
-                                logger.log_event(event)
+                                logger.step_end(step.id, "paused")
+                                logger.run_end("paused")
+                                logger.close()
+                            human_input_event = event
+                            break
 
-                            # _log_ prefixed events are metadata for the logger only
-                            if event.get("type", "").startswith("_log_"):
-                                continue
-
-                            if event.get("type") == "human_input_required":
-                                run.waiting_for_human = True
-                                run.status = "paused"
-                                run.current_step_id = step.id
-                                # Track the sub-run that needs human input when the
-                                # request originated inside a nested orchestration.
-                                if event.get("nested_run_id"):
-                                    run.nested_run_id = event["nested_run_id"]
-                                    run.nested_orch_id = event.get("nested_orch_id")
-                                else:
-                                    run.nested_run_id = None
-                                    run.nested_orch_id = None
-                                state.checkpoint()
-                                if logger:
-                                    logger.step_end(step.id, "paused")
-                                    logger.run_end("paused")
-                                    logger.close()
-                                # Break exits the async-for and then the
-                                # fail_after scope cleanly in this task.
-                                # The event is yielded below, outside the scope,
-                                # so the generator suspends with no cancel scope
-                                # active — safe for cross-task GC finalization.
-                                human_input_event = event
-                                break
-
-                            if event.get("type") == "orchestration_end":
-                                yield event
-                                run.status = "completed"
-                                if logger:
-                                    logger.step_end(step.id, "completed")
-                                break
-
+                        if event.get("type") == "orchestration_end":
                             yield event
-                except TimeoutError:
+                            run.status = "completed"
+                            if logger:
+                                logger.step_end(step.id, "completed")
+                            break
+
+                        yield event
+                except (TimeoutError, Exception) as _te:
+                    # anyio/MCP may deliver timeouts as ExceptionGroup([TimeoutError])
+                    # on Python 3.11+; unwrap it so timeouts are reported as
+                    # timeouts. Anything else re-raises into the generic handler.
+                    if _extract_timeout(_te) is None:
+                        raise
                     yield {
                         "type": "step_error", "orch_step_id": step.id,
                         "error": f"Step '{step.name}' timed out after {step_timeout}s",
@@ -247,10 +301,9 @@ class OrchestrationEngine:
                     if logger:
                         logger.step_end(step.id, "failed", f"Timed out after {step_timeout}s")
 
-                # Yield human_input_required OUTSIDE the anyio cancel scope.
-                # The generator suspends here with no active cancel scope, so
-                # Python's GC-triggered aclose() (which runs in a new asyncio
-                # Task) won't hit "cancel scope in a different task".
+                # Yield human_input_required outside the try/except so the
+                # generator suspends here with no exception handler holding
+                # state open — safe for cross-task GC finalization.
                 if human_input_event is not None:
                     yield human_input_event
                     return
@@ -294,7 +347,10 @@ class OrchestrationEngine:
 
             except Exception as e:
                 import traceback; print(f"DEBUG ENGINE: ❌ EXCEPTION in step '{step.id}': {e}\n{traceback.format_exc()}", flush=True)
-                safe_error = "An internal error occurred while executing this step."
+                if _extract_timeout(e) is not None:
+                    safe_error = f"Step '{step.name}' timed out after {step_timeout}s"
+                else:
+                    safe_error = "An internal error occurred while executing this step."
                 run.step_history.append({
                     "step_id": step.id,
                     "step_name": step.name,

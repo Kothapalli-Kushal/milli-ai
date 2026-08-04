@@ -24,6 +24,14 @@ from core.tools import aggregate_all_tools, build_system_prompt, DEFAULT_TOOLS_B
 from core.routes.agents import load_user_agents, get_active_agent_data
 from core.routes.tools import load_custom_tools
 
+# Self-improvement trace hook (core/improve/) — failure-isolated: if the
+# module can't load, tracing degrades to a no-op and agents run unaffected.
+try:
+    from core.improve.trace_writer import trace_agent_run
+except Exception:  # pragma: no cover
+    def trace_agent_run(fn):
+        return fn
+
 import anyio as _anyio
 import re as _re
 from datetime import timedelta
@@ -315,6 +323,7 @@ def _inject_db_context(agent_data, system_template):
                 "- Write queries (INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE, etc.) ARE permitted.\n"
                 "- You MUST explicitly state the exact query you intend to run and ask the user for confirmation BEFORE calling `run_sql_query` with any write query.\n"
                 "- Never assume consent. Even for seemingly safe updates, always confirm first.\n"
+                "- If the user responds with 'APPROVE', 'approve', 'yes', 'go ahead', 'confirmed', 'run it', or any clear affirmative to your confirmation request, you MUST immediately call `run_sql_query` with the exact query you stated. Do NOT ask for confirmation again.\n"
             )
         else:
             db_context += (
@@ -587,6 +596,7 @@ async def _run_spawn_subtask_batch(
     return list(await asyncio.gather(*[_run_one(args) for args in subtask_calls]))
 
 
+@trace_agent_run  # Checkpoint-1 hook: tee events into a trace file (additive, no behavior change)
 async def run_agent_step(
     message,
     agent_id,

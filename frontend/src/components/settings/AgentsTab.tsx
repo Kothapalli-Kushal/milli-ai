@@ -7,6 +7,11 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/store';
 import { addAgent, updateAgent } from '@/store/settingsSlice';
 import { ToastNotification } from './ToastNotification';
+import { InsightsPanel } from '@/components/improve/InsightsPanel';
+import { DiffReview } from '@/components/improve/DiffReview';
+import { VersionHistory } from '@/components/improve/VersionHistory';
+import { BenchmarkEditor } from '@/components/improve/BenchmarkEditor';
+import { InboxPanel } from '@/components/improve/InboxPanel';
 
 interface AgentsTabProps {
     agents: any[];
@@ -38,7 +43,8 @@ export const AgentsTab = ({
     const [promptDescription, setPromptDescription] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
-    const [agentSubTab, setAgentSubTab] = useState<'config' | 'messaging'>('config');
+    const [agentSubTab, setAgentSubTab] = useState<'config' | 'messaging' | 'improve'>('config');
+    const [improveRefreshKey, setImproveRefreshKey] = useState(0);
     const [agentChannels, setAgentChannels] = useState<any[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' } | null>(null);
@@ -424,7 +430,7 @@ export const AgentsTab = ({
 
                             {/* Sub-tab row */}
                             <div className="flex gap-0 border-b border-zinc-800">
-                                {[{ id: 'config', label: 'Configuration' }, { id: 'messaging', label: 'Messaging Channels' }].map(t => (
+                                {[{ id: 'config', label: 'Configuration' }, { id: 'messaging', label: 'Messaging Channels' }, { id: 'improve', label: 'Self-Improve' }].map(t => (
                                     <button
                                         key={t.id}
                                         onClick={() => {
@@ -908,6 +914,36 @@ export const AgentsTab = ({
                                         </div>
                                     )}
                                 </div>
+                            )}
+
+                            {/* ── Self-Improve sub-tab ─────────────────── */}
+                            {agentSubTab === 'improve' && (
+                                draftAgent.id && agents.some((a: any) => a.id === draftAgent.id) ? (
+                                    <div className="space-y-6">
+                                        <InsightsPanel targetId={draftAgent.id} targetKind="agent" />
+                                        <DiffReview
+                                            targetId={draftAgent.id}
+                                            targetKind="agent"
+                                            onApplied={() => setImproveRefreshKey(k => k + 1)}
+                                        />
+                                        <BenchmarkEditor
+                                            targetId={draftAgent.id}
+                                            targetKind="agent"
+                                            onRan={() => setImproveRefreshKey(k => k + 1)}
+                                        />
+                                        <VersionHistory
+                                            targetId={draftAgent.id}
+                                            targetKind="agent"
+                                            refreshKey={improveRefreshKey}
+                                            onRolledBack={() => setImproveRefreshKey(k => k + 1)}
+                                        />
+                                        <InboxPanel objectId={draftAgent.id} />
+                                    </div>
+                                ) : (
+                                    <div className="p-8 border border-dashed border-zinc-800 text-center text-zinc-600">
+                                        <p className="text-xs">Save this agent first — self-improvement works on saved agents with recorded runs.</p>
+                                    </div>
+                                )
                             )}
                         </>)}
                     </div>

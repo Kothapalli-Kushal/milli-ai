@@ -441,13 +441,21 @@ async def get_models():
         return True, models, []
 
     async def fetch_github_copilot_cli() -> tuple[bool, list[str], list[str]]:
-        import shutil
-        if not shutil.which("copilot"):
+        import shutil, sys
+        resolved = shutil.which("copilot")
+        if not resolved:
             return False, [], []
-        # Verify it's the GitHub Copilot CLI binary
+        # Verify it's the GitHub Copilot CLI binary.
+        # On Windows, npm and VS Code's bundled Copilot ship .bat/.cmd shims,
+        # which Windows' CreateProcess cannot launch directly — wrap them in
+        # cmd.exe /c so subprocess spawning succeeds.
+        if sys.platform == "win32" and resolved.lower().endswith((".bat", ".cmd")):
+            launch_args = ["cmd.exe", "/c", resolved, "--version"]
+        else:
+            launch_args = [resolved, "--version"]
         try:
             proc = await asyncio.create_subprocess_exec(
-                "copilot", "--version",
+                *launch_args,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )

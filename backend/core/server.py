@@ -58,6 +58,7 @@ from core.routes.api_keys import router as api_keys_router
 from core.routes.api_v1 import router as api_v1_router
 from core.routes.api_v2 import router as api_v2_router
 from core.routes.scale import router as scale_router
+from core.routes.improve import router as improve_router
 from core.profiling import TimingMiddleware
 from core.internal_auth import InternalTokenMiddleware
 
@@ -770,6 +771,7 @@ app.include_router(api_keys_router)
 app.include_router(api_v1_router, prefix="/api/v1")
 app.include_router(api_v2_router, prefix="/api/v2")
 app.include_router(scale_router, prefix="/api")
+app.include_router(improve_router)  # self-improvement routes (auth-scoped, see core/improve/SCHEMA.md §3)
 
 if __name__ == "__main__":
     import uvicorn

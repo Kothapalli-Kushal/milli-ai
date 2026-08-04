@@ -24,6 +24,13 @@ class StepType(str, Enum):
     SWITCH = "switch"
     PRINT = "print"
     END = "end"
+    # Self-improvement steps (CP5 — executors live in core/improve/steps.py)
+    IMPROVE_ANALYZE = "improve_analyze"
+    IMPROVE_PROPOSE = "improve_propose"
+    IMPROVE_REVIEW = "improve_review"
+    IMPROVE_APPLY = "improve_apply"
+    BENCHMARK = "benchmark"
+    IMPROVE_RATCHET_DECIDE = "improve_ratchet_decide"
 
 
 class StepConfig(BaseModel):
@@ -74,7 +81,8 @@ class StepConfig(BaseModel):
 
     # HUMAN -- pause for human input
     human_prompt: str | None = None
-    human_fields: list[dict[str, str]] = []  # [{name, type, label}]
+    # [{name, type, label, options?: list[str], multiple?: bool}]
+    human_fields: list[dict[str, Any]] = []
     human_channel_id: str | None = None      # messaging channel to notify (optional)
     human_timeout_seconds: int = int(ORCH_HUMAN_TIMEOUT)  # how long to wait for messaging response
 
@@ -106,6 +114,16 @@ class StepConfig(BaseModel):
     # None (default) = auto (full history on any re-run).
     include_full_history: bool | None = None
 
+    # IMPROVE_* / BENCHMARK — self-improvement step config (CP5)
+    improve_target_id: str | None = None       # agent/orchestration under improvement
+    improve_target_kind: str = "agent"         # "agent" | "orchestration"
+    benchmark_id: str | None = None            # BENCHMARK — suite to run
+    benchmark_record_as: str | None = None     # "baseline" | "new" — stamps the ImprovementRun
+    ratchet_threshold: float = 0.0             # min score delta required to keep a new version
+    ratchet_plateau_patience: int = 2          # stop after N consecutive reverts
+    ratchet_max_iterations: int = 5            # hard cap on ratchet loop iterations
+    improve_budget_usd: float | None = None    # per-run LLM spend cap (usage_tracker join)
+
     # Graph routing
     next_step_id: str | None = None  # Linear next step / loop "done" path
     max_iterations: int = 3  # Max times this step can execute in one run (loop guard)
@@ -134,6 +152,13 @@ class Orchestration(BaseModel):
     created_at: str | None = None
     updated_at: str | None = None
 
+    # ── Self-improvement versioning (core/improve/SCHEMA.md §7) ──
+    parent_id: str | None = None  # id of the version this one was derived from
+    version_n: int = 1
+    is_active: bool = True
+    improvement_run_id: str | None = None
+    metric_snapshot: dict[str, Any] | None = None
+
 
 class OrchestrationRun(BaseModel):
     """A single execution instance of an orchestration."""
@@ -148,7 +173,7 @@ class OrchestrationRun(BaseModel):
     # Human-in-the-loop
     waiting_for_human: bool = False
     human_prompt: str | None = None
-    human_fields: list[dict[str, str]] = []
+    human_fields: list[dict[str, Any]] = []
     # Nested-orchestration human-in-the-loop tracking
     nested_run_id: str | None = None   # sub-run paused waiting for human input
     nested_orch_id: str | None = None  # sub-orchestration definition ID

@@ -401,6 +401,21 @@ async def call_cli_provider(
         base_cli = cli_model.lower()
     variant = parts[2] if len(parts) > 2 else None
 
+    # ── ACP fast-path for Copilot ──
+    # `copilot -p <prompt>` inlines the whole prompt as an argv argument, which
+    # hits Windows' cmd.exe 8,191-char command-line limit almost immediately
+    # once tool schemas + history are baked in. Setting SYNAPSE_COPILOT_MODE=acp
+    # routes through `copilot --acp` over stdio (newline-delimited JSON-RPC)
+    # instead, which has no length ceiling. See core/copilot_acp.py.
+    if base_cli == "cli.copilot" and os.getenv("SYNAPSE_COPILOT_MODE", "").lower() == "acp":
+        try:
+            from core.copilot_acp import call_copilot_acp, ACPError
+            return await call_copilot_acp(full_prompt=full_prompt)
+        except ACPError as e:
+            raise LLMError(f"CLI provider '{cli_model}' (ACP): {e}") from e
+        except Exception as e:
+            raise LLMError(f"CLI provider '{cli_model}' (ACP) unexpected error: {e}") from e
+
     base_cmd = _CLI_COMMANDS.get(base_cli)
     if not base_cmd:
         raise LLMError(f"Unknown CLI base '{base_cli}'. Supported: {list(_CLI_COMMANDS.keys())}")
@@ -535,11 +550,20 @@ async def call_cli_provider(
 
             stdin_source = open(temp_input_file.name, "rb")
 
-        print(f"DEBUG: 🖥️  CLI provider '{cli_model}' — spawning subprocess: {' '.join(str(a) for a in cmd)}", flush=True)
+        # On Windows, npm and VS Code ship CLIs (claude/gemini/codex/copilot)
+        # as .bat/.cmd shims. CreateProcess cannot launch those directly, so we
+        # wrap them via cmd.exe /c. Non-Windows and native .exe binaries take
+        # the fast path.
+        import sys as _sys
+        if _sys.platform == "win32" and executable.lower().endswith((".bat", ".cmd")):
+            spawn_argv = ["cmd.exe", "/c", executable, *cmd[1:]]
+        else:
+            spawn_argv = [executable, *cmd[1:]]
+
+        print(f"DEBUG: 🖥️  CLI provider '{cli_model}' — spawning subprocess: {' '.join(str(a) for a in spawn_argv)}", flush=True)
 
         process = await asyncio.create_subprocess_exec(
-            executable,
-            *cmd[1:],
+            *spawn_argv,
             stdin=stdin_source,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

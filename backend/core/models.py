@@ -53,6 +53,13 @@ class Agent(BaseModel):
     provider: str | None = None  # auto-detected from model name
     max_turns: int | None = None  # per-agent turn limit override (None = use global default of 30)
     delegate_agent_ids: list[str] = []  # for delegate-type agents; empty = allow all
+    # ── Self-improvement versioning (core/improve/SCHEMA.md §7) ──
+    parent_id: str | None = None  # id of the version this one was derived from
+    version_n: int = 1
+    is_active: bool = True
+    improvement_run_id: str | None = None
+    metric_snapshot: dict[str, Any] | None = None
+    trace_retention_days: int | None = None  # per-agent trace retention override (None = 30-day default)
 
 class Repo(BaseModel):
     id: str

@@ -1,6 +1,6 @@
 import type { Node, Edge } from '@xyflow/react';
 
-export type StepType = 'agent' | 'llm' | 'tool' | 'evaluator' | 'parallel' | 'merge' | 'loop' | 'human' | 'transform' | 'extract_json' | 'if_else' | 'switch' | 'print' | 'end';
+export type StepType = 'agent' | 'llm' | 'tool' | 'evaluator' | 'parallel' | 'merge' | 'loop' | 'human' | 'transform' | 'extract_json' | 'if_else' | 'switch' | 'print' | 'end' | 'improve_analyze' | 'improve_propose' | 'improve_review' | 'improve_apply' | 'benchmark' | 'improve_ratchet_decide';
 
 export interface StepConfig {
     id: string;
@@ -51,7 +51,7 @@ export interface StepConfig {
 
     // HUMAN
     human_prompt?: string;
-    human_fields?: { name: string; type: string; label: string }[];
+    human_fields?: { name: string; type: string; label: string; options?: string[] }[];
 
     // I/O mapping
     input_keys?: string[];
@@ -77,6 +77,16 @@ export interface StepConfig {
     // Graph routing
     next_step_id?: string;
     max_iterations?: number;
+
+    // IMPROVE_* / BENCHMARK — self-improvement step config (Checkpoint 5)
+    improve_target_id?: string;
+    improve_target_kind?: 'agent' | 'orchestration';
+    benchmark_id?: string;
+    benchmark_record_as?: 'baseline' | 'new' | null;
+    ratchet_threshold?: number;
+    ratchet_plateau_patience?: number;
+    ratchet_max_iterations?: number;
+    improve_budget_usd?: number | null;
 
     // Visual canvas position
     position_x?: number;
@@ -126,7 +136,7 @@ export interface OrchestrationRun {
     current_step_id?: string;
     waiting_for_human: boolean;
     human_prompt?: string;
-    human_fields?: { name: string; type: string; label: string }[];
+    human_fields?: { name: string; type: string; label: string; options?: string[] }[];
     total_tokens_used: number;
     total_cost_usd: number;
     cache_read_tokens_total?: number;
@@ -167,4 +177,10 @@ export const STEP_TYPE_META: Record<StepType, { label: string; color: string; ic
     switch:       { label: 'Switch',       color: '#06b6d4', icon: 'ArrowLeftRight' },
     print:        { label: 'Print',        color: '#84cc16', icon: 'FileText' },
     end:          { label: 'End',          color: '#6b7280', icon: 'Square' },
+    improve_analyze:        { label: 'Improve: Analyze', color: '#0ea5e9', icon: 'ScanSearch' },
+    improve_propose:        { label: 'Improve: Propose', color: '#22d3ee', icon: 'Lightbulb' },
+    improve_review:         { label: 'Improve: Review',  color: '#f43f5e', icon: 'UserCheck' },
+    improve_apply:          { label: 'Improve: Apply',   color: '#22c55e', icon: 'CheckCheck' },
+    benchmark:              { label: 'Benchmark',        color: '#a78bfa', icon: 'FlaskConical' },
+    improve_ratchet_decide: { label: 'Ratchet Decide',   color: '#fb923c', icon: 'TrendingUp' },
 };

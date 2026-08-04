@@ -31,8 +31,8 @@ const ibmPlexSans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Synapse AI",
-  description: "Synapse AI",
+  title: "Milli AI",
+  description: "Milli AI",
 };
 
 export default function RootLayout({

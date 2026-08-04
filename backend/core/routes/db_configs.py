@@ -2,11 +2,30 @@
 DB configuration management endpoints (CRUD + schema refresh).
 """
 import os
+import re
 from datetime import datetime
+from urllib.parse import unquote
 from fastapi import APIRouter, HTTPException
 from core.models import DBConfig
 from core.config import DATA_DIR
 from core.json_store import JsonStore
+
+_SYSTEM_SCHEMAS = {
+    'information_schema', 'sys', 'guest', 'db_accessadmin',
+    'db_backupoperator', 'db_datareader', 'db_datawriter',
+    'db_ddladmin', 'db_denydatareader', 'db_denydatawriter',
+    'db_owner', 'db_securityadmin',
+}
+
+
+def _extract_database_name(connection_string: str) -> str | None:
+    """Extract the DATABASE name from an ODBC or SQLAlchemy connection string."""
+    # SQLAlchemy URL-encodes the inner ODBC string (`odbc_connect=DATABASE%3D...`);
+    # decode once so the same regex matches both raw ODBC and URL-encoded forms.
+    haystack = unquote(connection_string)
+    match = re.search(r'DATABASE=([^;]+)', haystack, re.IGNORECASE)
+    return match.group(1).strip() if match else None
+
 
 router = APIRouter()
 
@@ -59,20 +78,55 @@ async def refresh_db_schema(config_id: str):
         raise HTTPException(status_code=400, detail="No connection string configured")
 
     try:
-        from sqlalchemy import create_engine, inspect, text
+        from sqlalchemy import create_engine, text
 
         engine = create_engine(connection_string, connect_args={"connect_timeout": 10})
-        inspector = inspect(engine)
+
+        db_name = _extract_database_name(connection_string)
+        if not db_name:
+            raise ValueError("Could not extract DATABASE name from connection string.")
+
+        db = db_name  # e.g. "ALDB_VEN"
 
         schema_lines = []
-        table_names = inspector.get_table_names()
+        with engine.connect() as conn:
+            # 1. Get all non-system schemas from the target database
+            schema_rows = conn.execute(text(f"""
+                SELECT name
+                FROM [{db}].sys.schemas
+                WHERE name NOT IN (
+                    'sys','guest','INFORMATION_SCHEMA',
+                    'db_owner','db_datareader','db_datawriter',
+                    'db_ddladmin','db_denydatareader','db_denydatawriter',
+                    'db_accessadmin','db_backupoperator','db_securityadmin'
+                )
+                ORDER BY name
+            """)).fetchall()
+            schema_names = [row[0] for row in schema_rows] or ["dbo"]
 
-        for table_name in table_names:
-            columns = inspector.get_columns(table_name)
-            col_defs = ", ".join(
-                f"{col['name']} ({str(col['type'])})" for col in columns
-            )
-            schema_lines.append(f"  {table_name}({col_defs})")
+            # 2. For each schema, get tables and their columns
+            for schema_name in schema_names:
+                table_rows = conn.execute(text(f"""
+                    SELECT t.name
+                    FROM [{db}].sys.tables t
+                    JOIN [{db}].sys.schemas s ON s.schema_id = t.schema_id
+                    WHERE s.name = :schema
+                    ORDER BY t.name
+                """), {"schema": schema_name}).fetchall()
+
+                for (table_name,) in table_rows:
+                    col_rows = conn.execute(text(f"""
+                        SELECT c.name, tp.name AS type_name
+                        FROM [{db}].sys.columns c
+                        JOIN [{db}].sys.objects o ON o.object_id = c.object_id
+                        JOIN [{db}].sys.schemas s ON s.schema_id = o.schema_id
+                        JOIN [{db}].sys.types tp ON tp.user_type_id = c.user_type_id
+                        WHERE s.name = :schema AND o.name = :table
+                        ORDER BY c.column_id
+                    """), {"schema": schema_name, "table": table_name}).fetchall()
+
+                    col_defs = ", ".join(f"{col[0]} ({col[1]})" for col in col_rows)
+                    schema_lines.append(f"  {schema_name}.{table_name}({col_defs})")
 
         schema_info = "Tables:\n" + "\n".join(schema_lines) if schema_lines else "No tables found."
 

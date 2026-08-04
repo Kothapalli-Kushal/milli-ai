@@ -69,5 +69,18 @@
     "mcp_count": 4,
     "tool_count": 0,
     "file": "mcp_pack.bundle.json"
+  },
+  {
+    "id": "self_improvement",
+    "name": "Self-Improvement Pack",
+    "description": "Two ready-made improvement workflows \u2014 a human-gated loop (analyze \u2192 propose \u2192 review \u2192 apply \u2192 benchmark) and an autonomous ratchet that keeps only benchmark-verified improvements, with iteration/plateau/budget safeguards.",
+    "tags": [
+      "orchestrations"
+    ],
+    "agent_count": 0,
+    "orchestration_count": 2,
+    "mcp_count": 0,
+    "tool_count": 0,
+    "file": "self_improvement.bundle.json"
   }
 ]

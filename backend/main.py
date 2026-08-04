@@ -11,6 +11,9 @@ try:
 except ImportError:
     pass  # dotenv not installed — env vars must be set manually
 
+# Default Copilot CLI to ACP transport; explicit env/.env value still wins.
+os.environ.setdefault("SYNAPSE_COPILOT_MODE", "acp")
+
 import uvicorn
 
 # Add the current directory to sys.path so we can import from core, agents, etc.

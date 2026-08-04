@@ -38,10 +38,13 @@ class SharedState:
         """Persist full run state to disk atomically."""
         _ensure_runs_dir()
         target = RUNS_DIR / f"{self.run.run_id}.json"
-        # Atomic write: write to temp, then rename
+        # Atomic write: write to temp, then rename.
+        # encoding="utf-8" is required — on Windows os.fdopen defaults to
+        # cp1252, which cannot encode non-ASCII glyphs (emoji, arrows, em-dashes)
+        # that routinely appear in agent output, and crashes the whole step.
         fd, tmp_path = tempfile.mkstemp(dir=RUNS_DIR, suffix=".tmp")
         try:
-            with os.fdopen(fd, "w") as f:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(self.run.model_dump_json(indent=2))
             os.replace(tmp_path, target)
         except Exception:
@@ -55,7 +58,7 @@ class SharedState:
         path = RUNS_DIR / f"{run_id}.json"
         if not path.exists():
             raise FileNotFoundError(f"No checkpoint found for run {run_id}")
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
         run = OrchestrationRun.model_validate(data)
         return cls(run)
 
@@ -66,7 +69,7 @@ class SharedState:
         runs = []
         for f in sorted(RUNS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:limit]:
             try:
-                data = json.loads(f.read_text())
+                data = json.loads(f.read_text(encoding="utf-8"))
                 runs.append({
                     "run_id": data.get("run_id"),
                     "orchestration_id": data.get("orchestration_id"),
