@@ -275,7 +275,7 @@ class ToolStepExecutor:
     ) -> AsyncGenerator[dict, None]:
         from core.llm_providers import generate_response as llm_generate, detect_mode_from_model
         from core.config import load_settings
-        from core.react_engine import parse_tool_call
+        from core.react_engine import parse_tool_call, _inject_db_context
         from core.tools import aggregate_all_tools
         from core.scale.context import resolve_agent, resolve_custom_tools
 
@@ -344,6 +344,16 @@ class ToolStepExecutor:
             print(f"DEBUG TOOL STEP: turn {turn + 1}/{max_turns} model={model} tool={tool_name}", flush=True)
             try:
                 tool_sys_prompt = "You are a tool-calling assistant. Output ONLY valid JSON."
+                tool_sys_prompt = _inject_db_context(active_agent, tool_sys_prompt)
+                print(
+                    f"DEBUG TOOL STEP: step={step.id} agent_id={step.agent_id!r} "
+                    f"active_agent_keys={list(active_agent.keys())} "
+                    f"active_agent_type={active_agent.get('type')!r} "
+                    f"active_agent_db_configs={active_agent.get('db_configs')} "
+                    f"sys_prompt_has_LINKED_DATABASES={'### LINKED DATABASES ###' in tool_sys_prompt} "
+                    f"sys_prompt_len={len(tool_sys_prompt)}",
+                    flush=True,
+                )
                 if system_prompt_prefix:
                     tool_sys_prompt = system_prompt_prefix + "\n\n" + tool_sys_prompt
                 response = await llm_generate(

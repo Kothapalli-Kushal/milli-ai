@@ -89,7 +89,7 @@ export function StepConfigPanel({ step, agents, allStepIds, onUpdate, onDelete, 
 
                 {/* ===== TOOL config ===== */}
                 {step.type === 'tool' && (
-                    <ToolStepConfig step={step} update={update} textareaCls={textareaCls} selectCls={selectCls} availableModels={availableModels} />
+                    <ToolStepConfig step={step} update={update} agents={agents} textareaCls={textareaCls} selectCls={selectCls} availableModels={availableModels} />
                 )}
 
                 {/* ===== LLM config ===== */}
@@ -669,9 +669,10 @@ function HumanStepConfig({ step, update, textareaCls, inputCls, selectCls }: {
 }
 
 /** Tool Step config — single tool picker + prompt template + model override. */
-function ToolStepConfig({ step, update, textareaCls, selectCls, availableModels }: {
+function ToolStepConfig({ step, update, agents, textareaCls, selectCls, availableModels }: {
     step: StepConfig;
     update: (patch: Partial<StepConfig>) => void;
+    agents: any[];
     textareaCls: string;
     selectCls: string;
     availableModels?: string[];
@@ -691,6 +692,18 @@ function ToolStepConfig({ step, update, textareaCls, selectCls, availableModels 
         <div className="space-y-3">
             <div className="rounded bg-purple-950/40 border border-purple-800/40 px-3 py-2 text-[10px] text-purple-400 leading-relaxed">
                 <strong>Forced tool call</strong> — the LLM generates arguments for exactly one tool, then calls it. If the first attempt fails, the ReAct loop retries up to <em>Max Turns</em> times.
+            </div>
+            <div>
+                <label className="text-xs text-zinc-400 block mb-1">Agent <span className="text-zinc-600 normal-case">(optional)</span></label>
+                <select
+                    className={selectCls}
+                    value={step.agent_id || ''}
+                    onChange={(e) => update({ agent_id: e.target.value || undefined })}
+                >
+                    <option value="">(None — workspace default)</option>
+                    {agents.map((a: any) => <option key={a.id} value={a.id}>{a.name} ({a.type})</option>)}
+                </select>
+                <p className="text-[10px] text-zinc-500 mt-0.5">Agent whose DB context and custom/MCP tools are available when resolving this tool call.</p>
             </div>
             <div>
                 <label className="text-xs text-zinc-400 block mb-1">Tool</label>

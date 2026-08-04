@@ -71,6 +71,9 @@ function StepNodeComponent({ data, selected }: { data: any; selected?: boolean }
                         {step.forced_tool ? step.forced_tool : 'No tool selected'}
                     </div>
                 )}
+                {step.type === 'tool' && agentName && (
+                    <div className="text-[10px] text-zinc-400 truncate">via {agentName}</div>
+                )}
 
                 {/* LLM — show prompt snippet */}
                 {step.type === 'llm' && (
