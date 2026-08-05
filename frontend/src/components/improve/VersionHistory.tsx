@@ -1,11 +1,15 @@
 'use client';
 // Self-Improvement — VersionHistory (Checkpoint 3, checklist 3.16).
 // Version snapshots for one agent/orchestration with metric snapshots,
-// benchmark scores per version (Checkpoint 4, checklist 4.11), one-click
-// JSON rollback, and bulk revert of autonomous edits (Checkpoint 5, 5.19).
+// benchmark scores per version (Checkpoint 4, checklist 4.11; extended for
+// Checkpoint 6, checklists 6.32/6.33/6.43: process/outcome/composite chips,
+// train/holdout/regression breakdown, extraction-failure rate, unpinned flag,
+// and failing-check rows linked to their trace evidence), one-click JSON
+// rollback, and bulk revert of autonomous edits (Checkpoint 5, 5.19).
 import { useCallback, useEffect, useState } from 'react';
-import { FlaskConical, History, Loader2, RotateCcw, Undo2 } from 'lucide-react';
-import type { TargetKind, VersionSnapshot } from './types';
+import { ChevronDown, ChevronRight, FlaskConical, History, Loader2, RotateCcw, Undo2 } from 'lucide-react';
+import { EvidenceChips } from './InsightsPanel';
+import type { InputOutcome, OutcomeScores, Split, TargetKind, VersionSnapshot } from './types';
 
 interface VersionHistoryProps {
     targetId: string;
@@ -14,9 +18,61 @@ interface VersionHistoryProps {
     onRolledBack?: () => void;
 }
 
+interface BenchResult extends OutcomeScores {
+    run_id?: string;
+    benchmark_id: string;
+    score: number | null;
+}
+
+const SPLIT_ORDER: Split[] = ['train', 'holdout', 'regression'];
+const fmt = (v?: number | null) => (v === null || v === undefined ? 'N/A' : Number(v).toFixed(3));
+
+// Non-pass statuses worth a row. `extraction_failed` is rendered distinctly:
+// it means the extractor found nothing, NOT that the agent was wrong (§6.6).
+const ROW_STATUSES = new Set(['fail', 'execution_timeout', 'row_cap_exceeded', 'extraction_failed', 'judge_na']);
+
+function FailingCheckRows({ perInput }: { perInput: InputOutcome[] }) {
+    const [open, setOpen] = useState(false);
+    const rows = perInput.flatMap(inp =>
+        (inp.checks ?? [])
+            .filter(c => ROW_STATUSES.has(c.status))
+            .map(c => ({ inp, c }))
+    );
+    if (rows.length === 0) return null;
+    return (
+        <div>
+            <button
+                onClick={() => setOpen(!open)}
+                className="flex items-center gap-1 text-[9px] font-mono text-zinc-500 hover:text-zinc-300"
+            >
+                {open ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
+                {rows.length} failing check{rows.length === 1 ? '' : 's'}
+            </button>
+            {open && (
+                <div className="mt-1 space-y-1 pl-3 border-l border-zinc-800">
+                    {rows.map(({ inp, c }, i) => (
+                        <div key={i} className="text-[9px] font-mono">
+                            <span className="text-zinc-400">{inp.input_id}</span>
+                            <span className="text-zinc-600"> / </span>
+                            <span className="text-zinc-300">{c.check_id}</span>
+                            <span className={c.status === 'extraction_failed' ? 'text-amber-400' : 'text-red-400'}> {c.status}</span>
+                            {inp.vetoed && c.critical && <span className="text-red-400 font-bold"> · VETO</span>}
+                            {c.detail && <span className="text-zinc-600"> — {c.detail}</span>}
+                            {/* Evidence-first (3.17): every failing check links to its trace */}
+                            {c.trace_file && (
+                                <EvidenceChips evidence={[{ trace_file: c.trace_file, message_idx: c.message_idx ?? null }]} />
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export function VersionHistory({ targetId, refreshKey, onRolledBack }: VersionHistoryProps) {
     const [versions, setVersions] = useState<VersionSnapshot[]>([]);
-    const [benchScores, setBenchScores] = useState<Record<number, { score: number | null; benchmark_id: string }[]>>({});
+    const [benchScores, setBenchScores] = useState<Record<number, BenchResult[]>>({});
     const [loading, setLoading] = useState(false);
     const [busyVersion, setBusyVersion] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -34,14 +90,15 @@ export function VersionHistory({ targetId, refreshKey, onRolledBack }: VersionHi
         } finally {
             setLoading(false);
         }
-        // Benchmark results widget (4.11) — latest scores grouped by version.
+        // Benchmark results widget (4.11) — latest scores grouped by version,
+        // carrying the full CP6 record when present (6.32).
         try {
             const res = await fetch(`/api/improve/benchmark/results?target_object_id=${encodeURIComponent(targetId)}`);
             if (res.ok) {
                 const results = await res.json();
-                const byVersion: Record<number, { score: number | null; benchmark_id: string }[]> = {};
+                const byVersion: Record<number, BenchResult[]> = {};
                 for (const r of results) {
-                    (byVersion[r.target_version_n] ??= []).push({ score: r.score, benchmark_id: r.benchmark_id });
+                    (byVersion[r.target_version_n] ??= []).push(r);
                 }
                 setBenchScores(byVersion);
             }
@@ -131,10 +188,57 @@ export function VersionHistory({ targetId, refreshKey, onRolledBack }: VersionHi
                                     </div>
                                 )}
                                 {(benchScores[v.version_n] ?? []).map((b, i) => (
-                                    <span key={i} className="inline-flex items-center gap-1 px-1 py-0.5 text-[9px] font-mono border border-blue-900 text-blue-400 mr-1">
-                                        <FlaskConical className="h-2.5 w-2.5" />
-                                        {b.benchmark_id}: {b.score ?? 'N/A'}
-                                    </span>
+                                    <div key={i} className="space-y-0.5">
+                                        <div className="flex flex-wrap items-center gap-1">
+                                            <span className="inline-flex items-center gap-1 px-1 py-0.5 text-[9px] font-mono border border-blue-900 text-blue-400">
+                                                <FlaskConical className="h-2.5 w-2.5" />
+                                                {b.benchmark_id}: {b.score ?? 'N/A'}
+                                            </span>
+                                            {b.outcome_score !== undefined && (
+                                                <>
+                                                    <span className="px-1 py-0.5 text-[9px] font-mono border border-zinc-800 text-zinc-400">
+                                                        proc {fmt(b.process_score)}
+                                                    </span>
+                                                    <span className="px-1 py-0.5 text-[9px] font-mono border border-zinc-800 text-zinc-400">
+                                                        out {b.outcome_na ? 'N/A' : fmt(b.outcome_score)}
+                                                    </span>
+                                                    <span className="px-1 py-0.5 text-[9px] font-mono border border-zinc-800 text-zinc-300">
+                                                        comp {fmt(b.composite_score)}
+                                                    </span>
+                                                </>
+                                            )}
+                                            {SPLIT_ORDER.filter(s => b.scores_by_split?.[s] !== undefined).map(s => (
+                                                <span key={s} className={`px-1 py-0.5 text-[9px] font-mono border ${s === 'holdout' ? 'border-purple-900 text-purple-400' : 'border-zinc-800 text-zinc-400'}`}
+                                                    title={s === 'holdout' ? 'The ratchet decides on holdout' : undefined}>
+                                                    {s} {fmt(b.scores_by_split![s])}
+                                                </span>
+                                            ))}
+                                            {b.grading_strictness === 'mixed' && (
+                                                <span className="px-1 py-0.5 text-[9px] font-mono border border-amber-900 text-amber-400"
+                                                    title="Contains semantic_match — the rubric variance threshold applies">
+                                                    mixed
+                                                </span>
+                                            )}
+                                            {b.snapshot_id === 'unpinned' && (
+                                                <span className="px-1 py-0.5 text-[9px] font-mono border border-amber-900 text-amber-400"
+                                                    title="No pinned DB snapshot — outcome scores are not exactly reproducible">
+                                                    unpinned
+                                                </span>
+                                            )}
+                                            {(b.extraction_failed_rate ?? 0) > 0 && (
+                                                <span className="px-1 py-0.5 text-[9px] font-mono border border-red-900 text-red-400"
+                                                    title="A high rate almost always means misconfigured extractors, not a bad agent">
+                                                    extraction failed {((b.extraction_failed_rate ?? 0) * 100).toFixed(0)}%
+                                                </span>
+                                            )}
+                                            {b.incomparable_reason && (
+                                                <span className="px-1 py-0.5 text-[9px] font-mono border border-red-900 text-red-400" title={b.incomparable_reason}>
+                                                    incomparable
+                                                </span>
+                                            )}
+                                        </div>
+                                        {b.per_input && <FailingCheckRows perInput={b.per_input} />}
+                                    </div>
                                 ))}
                             </div>
                             {!v.is_active && (
