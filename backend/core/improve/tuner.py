@@ -212,11 +212,24 @@ def build_tuner_prompt(
     config: dict,
     insights: dict,
     allowed_models: set[str],
+    outcome_feedback: dict | None = None,
 ) -> str:
-    """User prompt under MAX_TUNER_PROMPT_CHARS, compacting insights if needed."""
-    config_json = json.dumps(config, indent=2, ensure_ascii=False)
+    """User prompt under MAX_TUNER_PROMPT_CHARS, compacting insights if needed.
 
-    def render(ins: dict) -> str:
+    CP6 adds the optional `outcome_feedback` block. Its contents are STRICTLY
+    bounded and are produced only by `feedback.build_outcome_feedback`, an
+    allow-list serializer — never by serializing an input and redacting. See
+    §6.7: leak the expected values and the tuner writes "if asked about
+    regions, answer APAC" into the system prompt, the benchmark score goes up,
+    and the agent gets worse.
+    """
+    config_json = json.dumps(config, indent=2, ensure_ascii=False)
+    feedback_json = (
+        json.dumps(outcome_feedback, indent=2, ensure_ascii=False)
+        if outcome_feedback else ""
+    )
+
+    def render(ins: dict, feedback: str) -> str:
         return (
             f"TARGET: {target_kind} '{target_object_id}'\n"
             f"{_allow_list_text(target_kind)}\n"
@@ -228,13 +241,21 @@ def build_tuner_prompt(
             + f"\nCURRENT CONFIGURATION:\n{config_json}\n"
             f"\nINSIGHTS (from execution-trace detectors):\n"
             f"{json.dumps(ins, indent=2, ensure_ascii=False)}\n"
-            "\nPropose the minimal set of allow-listed field edits that addresses the "
+            + (
+                "\nOUTCOME GRADING (train split only — check ids and failure "
+                "modes; the expected answers are deliberately withheld, and you "
+                "must not guess or hard-code them):\n" + feedback + "\n"
+                if feedback else ""
+            )
+            + "\nPropose the minimal set of allow-listed field edits that addresses the "
             "highest-severity findings. Respond with the JSON object only."
         )
 
-    prompt = render(insights)
+    prompt = render(insights, feedback_json)
     if len(prompt) > MAX_TUNER_PROMPT_CHARS:
-        prompt = render(compact_insights(insights))
+        prompt = render(compact_insights(insights), feedback_json)
+    if len(prompt) > MAX_TUNER_PROMPT_CHARS:  # drop feedback before truncating
+        prompt = render(compact_insights(insights), "")
     if len(prompt) > MAX_TUNER_PROMPT_CHARS:  # config itself is huge — hard truncate
         prompt = prompt[:MAX_TUNER_PROMPT_CHARS]
     return prompt
@@ -285,6 +306,36 @@ def allowed_models_for(config: dict) -> set[str]:
     return allowed
 
 
+# ── Outcome feedback lookup (CP6 §6.7) ────────────────────────────────────────
+
+def latest_outcome_feedback(
+    user_id: str | None, target_object_id: str, benchmark_id: str | None
+) -> dict | None:
+    """The most recent outcome-graded result for this target, §6.7-serialized.
+
+    Returns None when there is no CP6 result to report. The serializer, not
+    this function, is the leak boundary — everything here does is choose which
+    result record to hand it.
+    """
+    try:
+        from core.improve import benchmark as bm
+        from core.improve.feedback import build_outcome_feedback
+    except Exception:
+        return None
+    try:
+        results = bm.list_results(
+            user_id, benchmark_id=benchmark_id, target_object_id=target_object_id
+        )
+    except Exception:
+        return None
+    for record in reversed(results):
+        if record.get("per_input"):
+            return build_outcome_feedback(
+                record["per_input"], benchmark_id=record.get("benchmark_id")
+            )
+    return None
+
+
 # ── Main entry point ──────────────────────────────────────────────────────────
 
 async def propose(
@@ -293,12 +344,16 @@ async def propose(
     target_kind: str,
     tuner_model: str | None = None,
     mode: str = "human",
+    benchmark_id: str | None = None,
 ) -> dict:
     """Full propose flow: insights → tuner LLM → validated ProposedDiff.
 
     Opens an ImprovementRun (409-guarded by runs.create_run), pins the tuner
     model, writes the proposal payload, and returns {"run": ..., "proposed_diff": ...}.
     Raises TargetNotFound / runs.RunConflict / TunerOutputError.
+
+    When `benchmark_id` names a CP6 outcome-graded benchmark, the tuner also
+    sees the §6.7-bounded `outcome_feedback` block for its TRAIN split.
     """
     from core.config import load_settings
     from core.improve import runs as runs_mod
@@ -331,8 +386,12 @@ async def propose(
         )
         insights = extract_insights(report)
         allowed_models = allowed_models_for(config)
+        outcome_feedback = latest_outcome_feedback(
+            user_id, target_object_id, benchmark_id
+        )
         prompt = build_tuner_prompt(
-            target_object_id, target_kind, config, insights, allowed_models
+            target_object_id, target_kind, config, insights, allowed_models,
+            outcome_feedback,
         )
         diff = await _call_tuner_with_retry(
             prompt, resolved_model, settings, run["run_id"],

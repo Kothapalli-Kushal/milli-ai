@@ -23,6 +23,9 @@ INBOX_KINDS = {
     "plateau_stop",
     "timeout_stop",
     "max_iterations_stop",
+    # Checkpoint 6 (Appendix A6) — outcome-grading integrity events.
+    "grading_mismatch",    # scores measured with different rulers; not compared
+    "grading_unreliable",  # extraction_failed_rate > 0.5; score not trusted
 }
 
 

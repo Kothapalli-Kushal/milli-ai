@@ -12,6 +12,7 @@ playwright
 boto3
 sqlalchemy
 sqlalchemy[asyncio]
+sqlglot>=25.0
 asyncpg>=0.29
 psycopg2-binary
 pymysql

@@ -281,3 +281,189 @@ async def revert_autonomous(
     """Revert all autonomous edits since T (checklist 5.19). Audited."""
     from core.improve import applier
     return applier.revert_autonomous_since(user_id, req.since, req.object_id)
+
+
+# ── Checkpoint 6 — rubrics, augmentation, splits ─────────────────────────────
+#
+# Seven routes, all on THIS router, all behind `resolve_improve_user`. No new
+# router and no new server.py include: the §0.4 hook budget stays consumed.
+
+class ApproveVariantsRequest(BaseModel):
+    # input_id -> approve (True) / reject (False). Rejected variants are removed.
+    decisions: dict[str, bool]
+
+
+class ResplitRequest(BaseModel):
+    # Materializing splits invalidates score comparability against every
+    # previous run, so it cannot happen by accident.
+    confirm: bool = False
+
+
+@router.get("/api/improve/rubrics")
+async def list_rubrics_route(user_id: str = Depends(resolve_improve_user)):
+    """Every rubric's latest version."""
+    from core.improve import rubrics as rubrics_mod
+    return rubrics_mod.list_rubrics(user_id)
+
+
+@router.get("/api/improve/rubric/{rubric_id}")
+async def get_rubric_route(
+    rubric_id: str,
+    version: int | None = None,
+    user_id: str = Depends(resolve_improve_user),
+):
+    """Fetch a rubric; `?version=N` pins a specific immutable version."""
+    from core.improve import rubrics as rubrics_mod
+    try:
+        rubric = rubrics_mod.get_rubric(user_id, rubric_id, version)
+    except rubrics_mod.RubricNotFound:
+        raise HTTPException(status_code=404, detail="Rubric not found")
+    return {
+        "rubric": rubric,
+        "versions": [
+            {"version": v["version"], "content_hash": v["content_hash"],
+             "created_at": v.get("created_at"), "name": v.get("name")}
+            for v in rubrics_mod.list_versions(user_id, rubric_id)
+        ],
+    }
+
+
+@router.put("/api/improve/rubric/{rubric_id}")
+async def save_rubric_route(
+    rubric_id: str, body: dict, user_id: str = Depends(resolve_improve_user)
+):
+    """Create a rubric, or write a NEW version of one.
+
+    Never mutates an existing version — an edit mid-ratchet would measure
+    baseline and new scores with different rulers.
+    """
+    from pydantic import ValidationError
+    from core.improve import judge as judge_mod
+    from core.improve import rubrics as rubrics_mod
+
+    body = dict(body or {})
+    body["id"] = rubric_id  # path is authoritative
+    try:
+        saved = rubrics_mod.save_rubric(user_id, body)
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    # Judge == tuner model is a SOFT warning, surfaced, never a hard block.
+    warning = None
+    try:
+        settings = load_settings()
+        judge_model = judge_mod.resolve_judge_model(settings)
+        if judge_mod.judge_tuner_collision(settings, judge_model):
+            warning = (
+                f"The judge and the tuner both resolve to '{judge_model}'. "
+                "Optimizing against a judge that is the same model as the "
+                "optimizer is a known correlated-error risk."
+            )
+    except Exception:
+        pass
+    return {"rubric": saved, "warning": warning}
+
+
+@router.delete("/api/improve/rubric/{rubric_id}")
+async def delete_rubric_route(
+    rubric_id: str, user_id: str = Depends(resolve_improve_user)
+):
+    """Soft-delete. Refused while any benchmark still references the rubric."""
+    from core.improve import rubrics as rubrics_mod
+    try:
+        return rubrics_mod.delete_rubric(user_id, rubric_id)
+    except rubrics_mod.RubricNotFound:
+        raise HTTPException(status_code=404, detail="Rubric not found")
+    except rubrics_mod.RubricInUse as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.post("/api/improve/benchmark/{benchmark_id}/augment")
+async def augment_benchmark_route(
+    benchmark_id: str, user_id: str = Depends(resolve_improve_user)
+):
+    """Generate paraphrase variants; they land `approved: false`.
+
+    An explicit authoring action, never an implicit run-time step: an LLM
+    paraphrase that quietly changes the question is a corrupted benchmark, and
+    a corrupted benchmark silently misdirects the tuner for every subsequent
+    iteration.
+    """
+    from core.improve import augment as augment_mod
+    from core.improve import benchmark as bm
+    from core.improve import splits as splits_mod
+
+    try:
+        suite = bm.load_benchmark(user_id, benchmark_id)
+    except bm.BenchmarkNotFound:
+        raise HTTPException(status_code=404, detail="Benchmark not found")
+
+    try:
+        generated = await augment_mod.generate_variants(user_id, suite)
+    except augment_mod.AugmentationError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    superseded = augment_mod.supersede_unapproved(suite)
+    suite["inputs"] = list(suite.get("inputs") or []) + generated["variants"]
+    splits_mod.inherit_from_parents(suite["inputs"])
+    bm.save_benchmark(user_id, suite)
+
+    return {
+        "benchmark_id": benchmark_id,
+        "variants": generated["variants"],
+        "rejected": generated["rejected"],
+        "superseded_unapproved": superseded,
+    }
+
+
+@router.post("/api/improve/benchmark/{benchmark_id}/augment/approve")
+async def approve_variants_route(
+    benchmark_id: str,
+    req: ApproveVariantsRequest,
+    user_id: str = Depends(resolve_improve_user),
+):
+    """Approve or reject generated variants by id. Rejected ones are removed."""
+    from core.improve import augment as augment_mod
+    from core.improve import benchmark as bm
+
+    try:
+        suite = bm.load_benchmark(user_id, benchmark_id)
+    except bm.BenchmarkNotFound:
+        raise HTTPException(status_code=404, detail="Benchmark not found")
+
+    outcome = augment_mod.apply_approvals(suite, req.decisions)
+    bm.save_benchmark(user_id, suite)
+    return {"benchmark_id": benchmark_id, **outcome}
+
+
+@router.post("/api/improve/benchmark/{benchmark_id}/resplit")
+async def resplit_benchmark_route(
+    benchmark_id: str,
+    req: ResplitRequest,
+    user_id: str = Depends(resolve_improve_user),
+):
+    """Materialize splits/folds from `split_policy` into the benchmark file.
+
+    Requires explicit confirmation: reassigning splits invalidates score
+    comparability against every previous run of this benchmark.
+    """
+    from core.improve import benchmark as bm
+    from core.improve import splits as splits_mod
+
+    if not req.confirm:
+        raise HTTPException(
+            status_code=400,
+            detail=("Re-splitting invalidates score comparability with every "
+                    "previous run of this benchmark. Re-send with confirm=true."),
+        )
+    try:
+        suite = bm.load_benchmark(user_id, benchmark_id)
+    except bm.BenchmarkNotFound:
+        raise HTTPException(status_code=404, detail="Benchmark not found")
+
+    try:
+        report = splits_mod.materialize(suite)
+    except splits_mod.SplitPolicyError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    bm.save_benchmark(user_id, suite)
+    return {"benchmark_id": benchmark_id, **report}

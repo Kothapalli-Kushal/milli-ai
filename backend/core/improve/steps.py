@@ -97,6 +97,93 @@ def _notify_inbox(user_id: str, **kwargs) -> None:
         pass
 
 
+def grading_detail(result: dict) -> dict:
+    """The CP6 grading metadata a ratchet needs to decide COMPARABILITY.
+
+    Two scores are only comparable when they were produced by the same ruler.
+    Everything here is optional and absent for a CP4 benchmark, which is what
+    keeps the v1 path behaviourally identical.
+    """
+    return {
+        "grading_mode": result.get("grading_mode"),
+        "grading_strictness": result.get("grading_strictness"),
+        "rubric_id": result.get("rubric_id"),
+        "rubric_version": result.get("rubric_version"),
+        "rubric_content_hash": result.get("rubric_content_hash"),
+        "process_score": result.get("process_score"),
+        "outcome_score": result.get("outcome_score"),
+        "composite_score": result.get("composite_score"),
+        "outcome_na": result.get("outcome_na"),
+        "extraction_failed_rate": result.get("extraction_failed_rate"),
+        "snapshot_id": result.get("snapshot_id"),
+        "benchmark_run_id": result.get("run_id"),
+        "scores_by_split": result.get("scores_by_split"),
+        "scores_by_fold": result.get("scores_by_fold"),
+        "fold_stddev": result.get("fold_stddev"),
+        "fold_index": result.get("fold_index"),
+        "incomparable_reason": result.get("incomparable_reason"),
+    }
+
+
+def ratchet_basis(
+    baseline: float | None, new: float | None,
+    baseline_detail: dict | None, new_detail: dict | None,
+) -> tuple[float | None, float | None, str]:
+    """The pair of scores the ratchet actually decides on, and their basis.
+
+    THE RATCHET DECIDES ON HOLDOUT (§6.5.1). Train is what the tuner optimized
+    against; deciding on it rewards memorizing the train split. When both runs
+    report a holdout score, that is the comparison — even when the composite
+    (or train) moved the other way. Falls back to the composite for CP4-era
+    benchmarks and for suites with no holdout input.
+    """
+    baseline_splits = (baseline_detail or {}).get("scores_by_split") or {}
+    new_splits = (new_detail or {}).get("scores_by_split") or {}
+    baseline_holdout = baseline_splits.get("holdout")
+    new_holdout = new_splits.get("holdout")
+    if isinstance(baseline_holdout, (int, float)) and \
+            isinstance(new_holdout, (int, float)):
+        return float(baseline_holdout), float(new_holdout), "holdout"
+    return baseline, new, "composite"
+
+
+def unreliable_reason(baseline_detail: dict | None, new_detail: dict | None) -> str | None:
+    """Why a score must not be trusted, or None. Checklist 6.26.
+
+    A benchmark that silently scores 0 because of a mis-specified extractor
+    will drive the ratchet to revert good edits indefinitely.
+    """
+    for label, detail in (("baseline", baseline_detail), ("new", new_detail)):
+        reason = (detail or {}).get("incomparable_reason")
+        if reason:
+            return f"{label} run: {reason}"
+    return None
+
+
+def comparability_reason(baseline: dict | None, new: dict | None) -> str | None:
+    """Why two benchmark scores must NOT be compared, or None if they may be.
+
+    Silently comparing across rubric versions or grading modes is the subtlest
+    way this subsystem can lie to you (§6.4): baseline and new would be measured
+    with different rulers, and the ratchet would keep or revert on noise.
+    """
+    baseline = baseline or {}
+    new = new or {}
+    if (baseline.get("grading_mode") or None) != (new.get("grading_mode") or None):
+        return (
+            f"grading_mode changed between runs "
+            f"({baseline.get('grading_mode')!r} -> {new.get('grading_mode')!r})"
+        )
+    if (baseline.get("rubric_content_hash") or None) != (
+        new.get("rubric_content_hash") or None
+    ):
+        return (
+            "rubric content_hash changed between runs — the rubric was edited "
+            "mid-ratchet, so the two scores were measured with different rulers"
+        )
+    return None
+
+
 def _elapsed_seconds(run: OrchestrationRun) -> float:
     try:
         started = datetime.strptime(
@@ -381,17 +468,37 @@ class BenchmarkStepExecutor:
                 server_module=engine.server_module,
                 improvement_run_id=run.shared_state.get("improve_run_id"),
                 record_as=record_as,
+                # K-fold `per_iteration` rotation advances with the ratchet's
+                # iteration counter, so each iteration is validated against a
+                # different unseen slice (§6.5.2).
+                iteration=int(run.shared_state.get("_ratchet_iteration") or 0),
+                budget_usd=_budget(step, run),
             )
         except bm.BenchmarkNotFound:
             raise RuntimeError(f"Benchmark '{step.benchmark_id}' not found")
         except bm.BenchmarkTargetNotFound as e:
             raise RuntimeError(f"Benchmark target not found: {e}")
+        except bm.BudgetExceeded as e:
+            _notify_inbox(
+                user_id, kind="budget_abort", mode=_mode(run),
+                run_id=run.shared_state.get("improve_run_id"),
+                object_id=target_id, message=str(e),
+            )
+            run.status = "failed"
+            yield {"type": "step_error", "orch_step_id": step.id, "error": str(e)}
+            return
 
         score = result.get("score")
         score_key = step.output_key or (
             f"{record_as}_score" if record_as else "benchmark_score"
         )
         run.shared_state[score_key] = score
+
+        # CP6: the ratchet must be able to tell whether two scores were measured
+        # with the same ruler, so the richer score object rides alongside the
+        # bare float. Existing readers keep reading the float.
+        detail = grading_detail(result)
+        run.shared_state[f"{score_key}_detail"] = detail
 
         yield {
             "type": "benchmark_result",
@@ -402,6 +509,7 @@ class BenchmarkStepExecutor:
             "per_metric": result.get("per_metric", {}),
             "trace_count": result.get("trace_count", 0),
             "recorded_as": record_as,
+            **{k: v for k, v in detail.items() if v is not None},
         }
 
 
@@ -435,10 +543,42 @@ class ImproveRatchetDecideStepExecutor:
         baseline = state.get(baseline_key)
         new = state.get(new_key)
 
-        # ── keep / revert ────────────────────────────────────────────────────
+        # ── CP6 comparability gate (checklists 6.15 / 6.26) ──────────────────
+        # Run BEFORE any arithmetic: a score measured with a different ruler,
+        # or one produced by a misconfigured extractor, is not a smaller
+        # number — it is a meaningless one.
+        baseline_detail = state.get(f"{baseline_key}_detail")
+        new_detail = state.get(f"{new_key}_detail")
+        incomparable_reason = comparability_reason(baseline_detail, new_detail)
+        unreliable = unreliable_reason(baseline_detail, new_detail)
+
+        # ── keep / revert, decided on HOLDOUT where available (§6.5.1) ───────
+        baseline_basis, new_basis, decision_basis = ratchet_basis(
+            baseline, new, baseline_detail, new_detail
+        )
         delta = None
-        if isinstance(baseline, (int, float)) and isinstance(new, (int, float)):
-            delta = round(float(new) - float(baseline), 4)
+        if isinstance(baseline_basis, (int, float)) and \
+                isinstance(new_basis, (int, float)):
+            delta = round(float(new_basis) - float(baseline_basis), 4)
+        if incomparable_reason:
+            # Treat exactly like a missing score: revert, the CP5 safe default.
+            delta = None
+            _notify_inbox(
+                user_id, kind="grading_mismatch", mode=mode,
+                run_id=improve_run_id,
+                object_id=state.get("improve_target_id"),
+                message=(f"Scores are not comparable, treating the iteration as "
+                         f"a revert: {incomparable_reason}"),
+            )
+        elif unreliable:
+            delta = None
+            _notify_inbox(
+                user_id, kind="grading_unreliable", mode=mode,
+                run_id=improve_run_id,
+                object_id=state.get("improve_target_id"),
+                message=(f"Score is not reliable, treating the iteration as a "
+                         f"revert: {unreliable}"),
+            )
         # Missing scores are treated as a failed improvement — revert (safe default).
         decision = "keep" if (delta is not None and delta >= float(step.ratchet_threshold)) else "revert"
 
@@ -519,11 +659,15 @@ class ImproveRatchetDecideStepExecutor:
         state["ratchet_decision"] = decision
         state["ratchet_stop"] = stop_reason is not None
         state["ratchet_stop_reason"] = stop_reason
+        state["ratchet_incomparable_reason"] = incomparable_reason or unreliable
+        state["ratchet_decision_basis"] = decision_basis
         if step.output_key:
             state[step.output_key] = {
                 "decision": decision, "delta": delta, "iteration": iteration,
                 "stop": stop_reason is not None, "stop_reason": stop_reason,
                 "reverted_to_version_n": reverted_to,
+                "incomparable_reason": incomparable_reason or unreliable,
+                "decision_basis": decision_basis,
             }
 
         yield {
@@ -539,6 +683,10 @@ class ImproveRatchetDecideStepExecutor:
             "consecutive_reverts": consecutive,
             "stop": stop_reason is not None,
             "stop_reason": stop_reason,
+            "incomparable_reason": incomparable_reason or unreliable,
+            "decision_basis": decision_basis,
+            "baseline_holdout": baseline_basis if decision_basis == "holdout" else None,
+            "new_holdout": new_basis if decision_basis == "holdout" else None,
         }
 
 

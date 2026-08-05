@@ -19,6 +19,7 @@ import { InsightsPanel } from '@/components/improve/InsightsPanel';
 import { DiffReview } from '@/components/improve/DiffReview';
 import { VersionHistory } from '@/components/improve/VersionHistory';
 import { BenchmarkEditor } from '@/components/improve/BenchmarkEditor';
+import { RubricEditor } from '@/components/improve/RubricEditor';
 import { InboxPanel } from '@/components/improve/InboxPanel';
 
 type ToolCallLogEntry = { kind: 'tool_call'; tool_name: string; args: Record<string, any>; step_name?: string };
@@ -1476,6 +1477,7 @@ function BottomPanel({
                                 targetKind="orchestration"
                                 onRan={() => setImproveRefreshKey(k => k + 1)}
                             />
+                            <RubricEditor />
                             <VersionHistory
                                 targetId={draft.id}
                                 targetKind="orchestration"

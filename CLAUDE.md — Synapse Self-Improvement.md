@@ -15,6 +15,9 @@ There is **no external `recursive-improve` install and no CLI**. Everything ship
 | 3 — Tuner, Versioning, Apply & Rollback | ✅ COMPLETE (22/22), approved | 2026-08-03 |
 | 4 — Benchmark Suite | ✅ COMPLETE (13/13), approved | 2026-08-03 |
 | 5 — Orchestration Steps & Autonomous Ratchet | ✅ COMPLETE (21/22, 5.21 PARTIAL), approved — FINAL REPORT delivered | 2026-08-03 |
+| 6 — Outcome Grading & Rubrics | 🔵 IN PROGRESS — chunk 1 (6.1–6.15) ✅ approved; chunk 2 (6.16–6.30) ✅ 14/15, 6.28 PARTIAL; chunk 3 (6.31–6.46) ⬜ not started | 2026-08-04 |
+
+**Checkpoint 6 is being delivered in three human-approved chunks** (6.1–6.15, 6.16–6.30, 6.31–6.46). Each chunk ships with tests that must pass before approval is requested. See §CHECKPOINT 6 STATUS below for the per-item checklist.
 
 **What exists so far** (all under `backend/core/improve/` unless noted):
 
@@ -33,13 +36,100 @@ There is **no external `recursive-improve` install and no CLI**. Everything ship
 - `steps.py` (CP5) — six step executors (`IMPROVE_ANALYZE/PROPOSE/REVIEW/APPLY`, `BENCHMARK`, `IMPROVE_RATCHET_DECIDE`) shared by both variants; mode switch = shared-state key `improve_mode`; REVIEW pauses via the existing `human_input_required` flow (skipped when autonomous); ratchet enforces iteration cap (`ratchet_max_iterations`), plateau patience, proactive 90%-wallclock stop, and per-run LLM budget (`improve_budget_usd`, `usage_tracker` join by run_id); loop routing composes with existing IF_ELSE/SWITCH via `state.ratchet_stop`.
 - `inbox.py` (CP5) — append-only Self-Improvement Inbox at `inbox.json`; kinds apply/revert/budget_abort/plateau_stop/timeout_stop/max_iterations_stop; autonomous applies/reverts/aborts never silent. Routes: GET `/api/improve/inbox`, POST `/api/improve/revert-autonomous` (bulk revert since T, audited). `applier.py` gained the self-edit lockout (`executing_orchestration_id`) and `revert_autonomous_since`. Frontend: `InboxPanel.tsx` in both improve sections; "Revert autonomous edits since" control in `VersionHistory.tsx`; palette/config UI for all six steps. Shipped example: `examples/self_improvement.bundle.json` (human-gated + autonomous ratchet variants).
 
-**Hook budget consumed (§0.4):** `run_agent_step` ✅ (one `@trace_agent_run` decorator, react_engine.py), `OrchestrationEngine.run` ✅ (one try/finally, engine.py), `server.py` router include ✅, `STEP_EXECUTORS` registration ✅ (one failure-isolated update block, orchestration/steps.py), `StepType` enum + improve StepConfig fields ✅ (models_orchestration.py), node palette ✅ (STEP_TYPE_META in types/orchestration.ts + toolbar/STEP_ICONS in OrchestrationTab.tsx — Synapse's actual palette location; WorkflowCanvas.tsx renders from STEP_TYPE_META untouched). Budget fully consumed; no unsanctioned hooks.
+- `grading.py` (CP6) — the SINGLE outcome-grading pipeline; `grading_mode` picks a grader, never a parallel path. Four v1 extractors (`final_output`, `last_assistant_message`, `tool_call_arg`, `tool_result`, all reading the CP1 trace dict — no new instrumentation) and nine v1 comparators (`exact`, `contains_all`, `regex`, `numeric`, `json_equal`, `sql_equivalent`, `sql_execution`, `semantic_match`, `any_of`; `resultset` deliberately absent). Weighted partial credit + critical veto; `extraction_failed` is a distinct status excluded from the denominator, never a wrong answer; `aggregate_outcomes` + `composite_score` (normalized two-axis blend, N/A never coerced to 0).
+- `sql_compare.py` (CP6) — rung 1 `sql_equivalent` (sqlglot AST normalization: comments, identifier case, commutative predicate order, projection order; a low-weight DIAGNOSTIC, documented to fail JOIN-vs-subquery) and rung 2 `sql_execution` (executes candidate + reference, multiset compare, `order_sensitive: auto` from the reference's top-level ORDER BY, `by_position`/`by_name` columns, `float_tol`). Read-only guard on both sides reusing `tools/sql_agent.py::_is_write_query` as primary authority with sqlglot as a second opinion; `validate_reference_query` double-executes and warns on `LIMIT`-without-`ORDER BY` / `NOW()` / `RANDOM()`.
+- `judge.py` (CP6) — the ONE judging implementation (rubric mode and `semantic_match` share it). Model pinned per run (`judge_model` → `improve_judge_model` → `settings.model`); verdict cache at `judge_cache/` keyed per §6.4 — the primary reproducibility mechanism, not an optimization; MANDATORY injection hardening (untrusted-data fence + forged-marker neutralization); malformed verdict → one retry → criterion N/A; spend joins `usage_tracker` with `source="improve_judge"`.
+- `rubrics.py` (CP6) — the single authoritative Rubric registry for Synapse (the flat `data/rubrics.json` Training-tab sketch is SUPERSEDED). Immutable `rubrics/<id>/v<N>.json` + `index.json`; `content_hash` over `{id,name,criteria}` only, so a version bump alone never makes old scores incomparable; soft-delete refused while a benchmark references it. Public API: `get_rubric`, `list_rubrics`, `save_rubric`, `resolve_version`.
+- `splits.py` (CP6) — seeded, MATERIALIZED split/fold assignment (`explicit` / `random` / `kfold`); regression inputs never reassigned; augmented variants forced onto their parent's split+fold in code; `active_fold` rotation (`per_iteration` = `iteration % k`), `scores_by_split`, `scores_across_folds` (per-fold + stddev).
+- `augment.py` (CP6) — generate-once-freeze-forever paraphrasing as an explicit authoring action. DETERMINISTIC non-LLM constraint guard (numbers, quoted literals, named entities incl. `Q3`-style labels, length ratio, added-constraint words) + answer-leakage rejection; one reject-and-retry then skip; variants land `approved: false`, `weight: 0.5`, `expected: {"$ref": parent}` (shared, never copied).
+- `feedback.py` (CP6) — the §6.7 leak boundary: an explicit ALLOW-LIST SERIALIZER that constructs the tuner's `outcome_feedback` field by field from a whitelist. Never serialize-and-redact (redaction fails open; construction fails closed). Train split only; check ids, statuses, weights, extractor names, judge justifications and evidence pointers are visible — expected values, `key_points[].text`, `reference_output` and all holdout/regression content are not.
+- `benchmark.py` (CP6 additions) — `schema_version` dispatch (absent/1 → CP4 semantics EXACTLY; 2 → grading stage). Appendix A6 schema, save-time `validate_expected`, derived `grading_strictness`, `grade_outcomes`, two-axis composite, `all_folds` budget pre-flight, `outcome_variance_threshold`. `_strip_to_cp4` persists v1 suites with exactly their CP4 key set so legacy files are never rewritten.
+- `steps.py` (CP6 additions) — `grading_detail` (richer score object into shared state alongside the bare float), `comparability_reason` (refuse to compare across `grading_mode` / `rubric_content_hash`), `unreliable_reason` (`extraction_failed_rate > 0.5`), `ratchet_basis` (**the ratchet decides on HOLDOUT** when both runs report one).
+- Routes (CP6, all on the EXISTING improve router): GET `/rubrics`, GET/PUT/DELETE `/rubric/{id}`, POST `/benchmark/{id}/augment`, POST `/benchmark/{id}/augment/approve`, POST `/benchmark/{id}/resplit` (confirmation-gated).
+- Frontend (CP6): `improve/RubricEditor.tsx` — criteria CRUD, kind selector, anchor authoring, critical-floor control, version history with content hash. Mounted inside the EXISTING Self-Improve sub-tab in both `AgentsTab.tsx` and `OrchestrationTab.tsx` (2 lines each); `improve/types.ts` extended with the CP6 contracts.
+
+**Hook budget consumed (§0.4):** `run_agent_step` ✅ (one `@trace_agent_run` decorator, react_engine.py), `OrchestrationEngine.run` ✅ (one try/finally, engine.py), `server.py` router include ✅, `STEP_EXECUTORS` registration ✅ (one failure-isolated update block, orchestration/steps.py), `StepType` enum + improve StepConfig fields ✅ (models_orchestration.py), node palette ✅ (STEP_TYPE_META in types/orchestration.ts + toolbar/STEP_ICONS in OrchestrationTab.tsx — Synapse's actual palette location; WorkflowCanvas.tsx renders from STEP_TYPE_META untouched). Budget fully consumed; no unsanctioned hooks. **CP6 added ZERO new hooks** — seven routes on the existing improve router, panels inside the existing Self-Improve sub-tab, everything else in new `backend/core/improve/` modules (evidenced: `core/routes/improve.py` declares exactly one `APIRouter`, `server.py` contains exactly one `include_router(improve_router)`).
 
 **Model fields added (1.2/1.3):** `parent_id`, `version_n`, `is_active`, `improvement_run_id`, `metric_snapshot` on `Agent` (`core/models.py` — note: class is `Agent`, not `AgentConfig`) and `Orchestration` (`core/models_orchestration.py`); plus `trace_retention_days` on `Agent`. All defaulted — legacy JSON loads unchanged.
 
-**Tests:** `backend/tests/unit/test_improve_trace_writer.py` (27) + `test_improve_detectors.py` (28) + `test_improve_tuner_applier.py` (38) + `test_improve_benchmark.py` (16) + `test_improve_steps.py` (24) + `tests/api_app/test_improve_routes.py` (10) + `test_improve_benchmark_routes.py` (8) + `test_improve_inbox_routes.py` (5); full suite 476 passed. Run: `cd backend; ..\.venv\Scripts\python.exe -m pytest tests/unit tests/api_app -q`.
+**Tests:** `backend/tests/unit/test_improve_trace_writer.py` (27) + `test_improve_detectors.py` (28) + `test_improve_tuner_applier.py` (38) + `test_improve_benchmark.py` (16) + `test_improve_steps.py` (24) + `tests/api_app/test_improve_routes.py` (10) + `test_improve_benchmark_routes.py` (8) + `test_improve_inbox_routes.py` (5). CP6 adds `test_improve_grading.py` (107) + `test_improve_grading_steps.py` (20) + `test_improve_splits_augment.py` (75) + `tests/api_app/test_improve_cp6_routes.py` (30) = 232.
 
-**Recorded assumptions:** `user_id` = `settings.login_username` else `"default"`; chat runs have `run_id=None` (session fallback join); `git_branch`/`git_commit` null in CP1; token_usage flag threshold 50k; aggregate-insight rate threshold 0.5. CP3: workspace-default tuner model settings key = `improve_tuner_model` (falls back to `settings.model`); `model` edits bounded to {target's current model, workspace default}; rejected proposals close with decision `revert` (enum has no `rejected`); proposal payloads stored at `proposals/<run_id>.json` referenced from `runs.json`. CP5: autonomous mode = shared-state `improve_mode="autonomous"`; missing benchmark scores at the ratchet → revert (safe default); inbox kind `max_iterations_stop` added beyond Appendix A's five; ratchet iteration cap is its own `ratchet_max_iterations` field (the engine's generic `max_iterations` loop-guard redirects rather than stops); IMPROVE_ANALYZE window = all retained traces (retention policy bounds it).
+**Full suite: 729 passed** (495 pre-CP6, all unmodified, still passing). Run: `cd backend; ..\.venv\Scripts\python.exe -m pytest tests/unit tests/api_app -q`.
+
+> Note: the CP5 report cited "476 tests"; the suite had grown to **495** before CP6 began. 495 is the correct pre-CP6 baseline for checklist 6.37.
+
+**Environment (recorded 2026-08-04):** no venv existed — created at repo root `.venv` (matching the documented `..\.venv\Scripts\python.exe`) and added to `.gitignore`. `sqlglot>=25.0` added to `backend/requirements.txt`: §6.3.5 asserts it is "already a Synapse dependency via `tools/sql_agent.py`", which is **false** — that file's guard is a first-keyword check and sqlglot was neither installed nor declared. Node.js **is** installed at `C:\Program Files\nodejs` (v24.19.0 / npm 11.17.0) but is **not on PATH** — prepend it to run `tsc` / `next build`. Running pytest with `-s` on this Windows console needs `PYTHONIOENCODING=utf-8` (a pre-existing cp1252 issue: `test_improve_benchmark.py` fails under `-s` unmodified).
+
+**Recorded assumptions:** `user_id` = `settings.login_username` else `"default"`; chat runs have `run_id=None` (session fallback join); `git_branch`/`git_commit` null in CP1; token_usage flag threshold 50k; aggregate-insight rate threshold 0.5. CP3: workspace-default tuner model settings key = `improve_tuner_model` (falls back to `settings.model`); `model` edits bounded to {target's current model, workspace default}; rejected proposals close with decision `revert` (enum has no `rejected`); proposal payloads stored at `proposals/<run_id>.json` referenced from `runs.json`. CP5: autonomous mode = shared-state `improve_mode="autonomous"`; missing benchmark scores at the ratchet → revert (safe default); inbox kind `max_iterations_stop` added beyond Appendix A's five; ratchet iteration cap is its own `ratchet_max_iterations` field (the engine's generic `max_iterations` loop-guard redirects rather than stops); IMPROVE_ANALYZE window = all retained traces (retention policy bounds it). CP6: for a `schema_version: 2` benchmark the record's `score` carries the **composite** (so the CP5 ratchet compares composites unchanged) while v1 keeps the process score; v1 suites persist with exactly their CP4 key set; `content_hash` excludes `version`/`created_at`; the ratchet's basis is holdout only when **both** runs report a numeric holdout score, else the composite; SQL-argument detection for the 6.45 `semantic_match` ban keys on arg names `{query, sql, statement, sql_query}`; `JudgeSession` is a sync facade (grading runs after execution, and the deterministic path never touches a judge).
+
+---
+
+## CHECKPOINT 6 STATUS — Outcome Grading & Rubrics
+
+Delivered in three human-approved chunks. Chunk 3 has not started.
+
+### Chunk 1 — 6.1–6.15 ✅ APPROVED (15/15)
+
+Two scoring axes. `composite = process_weight × process_score + outcome_weight × outcome_score`, normalized. The process axis is CP4 code, untouched. The outcome axis is new: extractors pull a claim out of the CP1 trace, comparators decide it, and both grading modes emit one `InputOutcome` contract.
+
+| ID | Item | Status |
+|----|------|--------|
+| 6.1 | `grading.py` single `InputOutcome` contract; both modes conform | ✅ DONE |
+| 6.2 | `grading_mode` toggle at benchmark level + per-input override | ✅ DONE |
+| 6.3 | Two-axis composite; weights normalized | ✅ DONE |
+| 6.4 | **CP4 benchmark scores byte-identically to pre-CP6** | ✅ DONE |
+| 6.5 | All four v1 extractors implemented and unit-tested | ✅ DONE |
+| 6.6 | All nine v1 comparators (`resultset` absent, distinction documented) | ✅ DONE |
+| 6.7 | `sql_equivalent` via sqlglot; limitations documented | ✅ DONE |
+| 6.8 | Expected-value parse failure is a **save-time** error | ✅ DONE |
+| 6.9 | Weighted partial credit; critical veto forces 0, sets `vetoed` | ✅ DONE |
+| 6.10 | `rubrics.py`: immutable versions, `content_hash`, index, stable API | ✅ DONE |
+| 6.11 | All three criterion kinds implemented | ✅ DONE |
+| 6.12 | Judge model resolution chain, pinned, recorded | ✅ DONE |
+| 6.13 | Verdict cache; cache hit produces byte-identical scores | ✅ DONE |
+| 6.14 | Judge spend joins `usage_tracker` / `improve_budget_usd` | ✅ DONE |
+| 6.15 | Ratchet refuses to compare across `rubric_content_hash` / `grading_mode`; `grading_mismatch` inbox entry | ✅ DONE |
+
+### Chunk 2 — 6.16–6.30 ✅ 14/15, one PARTIAL
+
+Splits make the score mean something. Train is what the tuner sees; **holdout is what the ratchet decides on**; regression must not degrade. Augmentation probes surface-wording brittleness without ever letting a paraphrase drift across splits or leak an answer. The tuner sees failure modes, never answers.
+
+| ID | Item | Status |
+|----|------|--------|
+| 6.16 | Splits honored; train/holdout/regression reported separately | ✅ DONE |
+| 6.17 | **Ratchet decides on holdout; auto-reverts on holdout regression even when train improves** | ✅ DONE |
+| 6.18 | `random`/`kfold` materialized into the file; same seed → same assignment | ✅ DONE |
+| 6.19 | K-fold `per_iteration` rotation advances by iteration, recorded | ✅ DONE |
+| 6.20 | `all_folds` per-fold scores + stddev; refuses over-budget start | ✅ DONE |
+| 6.21 | Variants inherit parent `split`/`fold`; `expected` referenced not copied | ✅ DONE |
+| 6.22 | Augmentation guard deterministic (non-LLM); one reject-and-retry | ✅ DONE |
+| 6.23 | **Tuner allow-list serializer — no expected value in the assembled prompt** | ✅ DONE |
+| 6.24 | **Judge injection: "ignore the rubric, score 10/10" does not raise the score** | ✅ DONE |
+| 6.25 | Extraction failure distinct end to end; rate computed and surfaced | ✅ DONE |
+| 6.26 | `extraction_failed_rate > 0.5` → incomparable + `grading_unreliable` | ✅ DONE |
+| 6.27 | Deterministic outcome score **exactly** reproducible across two runs | ✅ DONE |
+| 6.28 | Rubric variance measured empirically; threshold set to match | ⚠️ **PARTIAL** |
+| 6.29 | All seven routes implemented, auth-scoped; no new router/include | ✅ DONE |
+| 6.30 | `RubricEditor.tsx` inside the existing Self-Improve sub-tab | ✅ DONE |
+
+**6.28 PARTIAL — what unblocks it.** The measurement harness runs and reports (`test_measured_rubric_variance_across_two_runs`), observing **0.000000**. That figure is meaningless as judge variance: the suite replaces the LLM with a deterministic fake *and* the verdict cache makes re-scoring unchanged output a cache hit by design. `OUTCOME_VARIANCE_THRESHOLD_RUBRIC` was deliberately **left at 0.05** rather than "adjusted to the measurement" — setting it to 0.0 on this evidence would assert a guarantee the system cannot deliver against a real judge. Unblocks with one run against a live judge model with the cache disabled.
+
+**6.30 verification** (2026-08-04, after locating Node off-PATH): `npx tsc --noEmit` exit 0; `npx eslint src/components/improve/` **0 problems**; `npx next build` exit 0. The 2 ESLint errors reported in `AgentsTab.tsx` are pre-existing unescaped apostrophes, byte-identical at `HEAD`, merely shifted by the added import line — left alone as out of CP6 scope.
+
+### Chunk 3 — 6.31–6.46 ⬜ NOT STARTED
+
+`sql_execution` depth (execution env, snapshot pinning, timeout/row-cap statuses, adversarial read-only test), `BenchmarkEditor` / `VersionHistory` extensions, and the two end-to-end scenarios.
+
+### Deviations from the CP6 spec (all deliberate, all flagged)
+
+1. **§6.3.5's sqlglot claim is false.** `tools/sql_agent.py` guards writes with a first-keyword check, and sqlglot was not installed or declared. Added to `requirements.txt`; the read-only guard reuses the *existing* `_is_write_query` as primary authority (no second guard written) with sqlglot as a second opinion catching CTE-hidden writes and stacked statements.
+2. **`inbox.py` touched** despite §6.0 listing it as internals-forbidden — two entries added to the `INBOX_KINDS` constant, required by Appendix A6. No internals restructured.
+3. **`all_folds` is one execution pass, not `k`.** There is no per-fold retraining at benchmark time, so every fold's holdout score comes from re-partitioning a single pass — identical statistic, deterministic, `k`× cheaper. Per-fold scores and stddev still reported; the budget pre-flight is kept and now guards a real 1× projection.
+4. **Budget pre-flight does not block a first run** — with no history to project from, refusing on a guess would block that benchmark forever.
+5. **`detail` is not in the tuner allow-list** — comparator detail strings quote the expected value back, which would defeat 6.23.
+6. **v1 suites persist with exactly their CP4 key set** (stricter than asked; makes 6.4 checkable by file comparison).
+7. **`content_hash` excludes `version`/`created_at`** so a re-save never spuriously makes prior scores incomparable.
+8. **Rejected variants are removed, not left disapproved**, so a benchmark cannot accumulate dead inputs a later bulk-approve could resurrect.
 
 ---
 

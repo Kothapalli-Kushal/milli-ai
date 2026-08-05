@@ -11,6 +11,7 @@ import { InsightsPanel } from '@/components/improve/InsightsPanel';
 import { DiffReview } from '@/components/improve/DiffReview';
 import { VersionHistory } from '@/components/improve/VersionHistory';
 import { BenchmarkEditor } from '@/components/improve/BenchmarkEditor';
+import { RubricEditor } from '@/components/improve/RubricEditor';
 import { InboxPanel } from '@/components/improve/InboxPanel';
 
 interface AgentsTabProps {
@@ -931,6 +932,7 @@ export const AgentsTab = ({
                                             targetKind="agent"
                                             onRan={() => setImproveRefreshKey(k => k + 1)}
                                         />
+                                        <RubricEditor />
                                         <VersionHistory
                                             targetId={draftAgent.id}
                                             targetKind="agent"
