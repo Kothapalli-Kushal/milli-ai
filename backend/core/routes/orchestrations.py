@@ -145,6 +145,7 @@ async def run_orchestration(orch_id: str, request: Request):
 
     body = await request.json()
     user_input = body.get("message", "")
+    initial_state = body.get("initial_state") or None
     run_id = f"run_{orch_id}_{int(time.time() * 1000)}"
 
     orch = Orchestration.model_validate(orch_data)
@@ -158,7 +159,11 @@ async def run_orchestration(orch_id: str, request: Request):
 
     async def _run_engine():
         try:
-            async for event in engine.run(user_input, run_id):
+            async for event in engine.run(
+                user_input,
+                run_id,
+                initial_state=initial_state,
+            ):
                 etype = event.get("type", "")
                 if etype not in ("chunk", "thinking", "token_usage"):
                     print(f"DEBUG SSE QUEUE: → {etype} step={event.get('orch_step_id', '')}", flush=True)

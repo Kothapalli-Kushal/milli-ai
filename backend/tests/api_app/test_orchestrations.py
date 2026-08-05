@@ -83,6 +83,35 @@ class TestOrchestrationRun:
         resp = await client.post("/api/orchestrations/nope/run", json={"message": "x"})
         assert resp.status_code == 404
 
+    async def test_run_passes_initial_state_to_engine(self, client, seed_orchestration, monkeypatch):
+        orch = seed_orchestration()
+        captured: dict = {}
+
+        class _CaptureEngine(_FakeEngine):
+            async def run(self, user_input, run_id, **kwargs):
+                captured["user_input"] = user_input
+                captured["run_id"] = run_id
+                captured["initial_state"] = kwargs.get("initial_state")
+                for ev in [E.orch_start(orch_id=orch["id"]), E.orch_complete(status_str="completed")]:
+                    yield ev
+
+        import core.orchestration.engine as engine_mod
+        monkeypatch.setattr(engine_mod, "OrchestrationEngine", _CaptureEngine)
+
+        payload = {
+            "message": "fine tune",
+            "initial_state": {
+                "improve_target_kind": "agent",
+                "improve_target_id": "agent_123",
+                "improve_benchmark_id": "bench_456",
+            },
+        }
+        resp = await client.post(f"/api/orchestrations/{orch['id']}/run", json=payload)
+        assert resp.status_code == 200
+        assert captured["user_input"] == "fine tune"
+        assert captured["run_id"].startswith(f"run_{orch['id']}_")
+        assert captured["initial_state"] == payload["initial_state"]
+
     async def test_engine_error_surfaces_as_orchestration_error(self, client, seed_orchestration, monkeypatch):
         orch = seed_orchestration()
 

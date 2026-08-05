@@ -88,6 +88,38 @@ def _budget(step: StepConfig, run: OrchestrationRun) -> float | None:
     return float(b) if b is not None else None
 
 
+def _benchmark_id(step: StepConfig, run: OrchestrationRun) -> str | None:
+    """Benchmark id from shared state override, else the step default."""
+    return run.shared_state.get("improve_benchmark_id") or step.benchmark_id
+
+
+def _ratchet_threshold(step: StepConfig, run: OrchestrationRun) -> float:
+    """Ratchet threshold from runtime state, else step config default."""
+    if run.shared_state.get("improve_ratchet_threshold") is not None:
+        return float(run.shared_state.get("improve_ratchet_threshold"))
+    if run.shared_state.get("ratchet_threshold") is not None:
+        return float(run.shared_state.get("ratchet_threshold"))
+    return float(step.ratchet_threshold)
+
+
+def _ratchet_max_iterations(step: StepConfig, run: OrchestrationRun) -> int:
+    """Ratchet max-iteration cap from runtime state, else step config default."""
+    if run.shared_state.get("improve_ratchet_max_iterations") is not None:
+        return int(run.shared_state.get("improve_ratchet_max_iterations"))
+    if run.shared_state.get("ratchet_max_iterations") is not None:
+        return int(run.shared_state.get("ratchet_max_iterations"))
+    return int(step.ratchet_max_iterations)
+
+
+def _ratchet_plateau_patience(step: StepConfig, run: OrchestrationRun) -> int:
+    """Ratchet plateau patience from runtime state, else step config default."""
+    if run.shared_state.get("improve_ratchet_plateau_patience") is not None:
+        return int(run.shared_state.get("improve_ratchet_plateau_patience"))
+    if run.shared_state.get("ratchet_plateau_patience") is not None:
+        return int(run.shared_state.get("ratchet_plateau_patience"))
+    return int(step.ratchet_plateau_patience)
+
+
 def _notify_inbox(user_id: str, **kwargs) -> None:
     """Best-effort inbox write — an unwritable inbox must not kill the run."""
     try:
@@ -445,7 +477,8 @@ class BenchmarkStepExecutor:
     ) -> AsyncGenerator[dict, None]:
         from core.improve import benchmark as bm
 
-        if not step.benchmark_id:
+        benchmark_id = _benchmark_id(step, run)
+        if not benchmark_id:
             raise RuntimeError(
                 f"Benchmark step '{step.name}' has no benchmark_id configured"
             )
@@ -457,13 +490,13 @@ class BenchmarkStepExecutor:
         )
 
         yield {"type": "_log_prompt", "orch_step_id": step.id,
-               "prompt": f"[Benchmark] suite={step.benchmark_id} "
+               "prompt": f"[Benchmark] suite={benchmark_id} "
                          f"target={target_id or '(suite default)'} record_as={record_as}"}
 
         try:
             result = await bm.run_benchmark(
                 user_id,
-                step.benchmark_id,
+                benchmark_id,
                 target_object_id=target_id,
                 server_module=engine.server_module,
                 improvement_run_id=run.shared_state.get("improve_run_id"),
@@ -475,7 +508,7 @@ class BenchmarkStepExecutor:
                 budget_usd=_budget(step, run),
             )
         except bm.BenchmarkNotFound:
-            raise RuntimeError(f"Benchmark '{step.benchmark_id}' not found")
+            raise RuntimeError(f"Benchmark '{benchmark_id}' not found")
         except bm.BenchmarkTargetNotFound as e:
             raise RuntimeError(f"Benchmark target not found: {e}")
         except bm.BudgetExceeded as e:
@@ -504,7 +537,7 @@ class BenchmarkStepExecutor:
             "type": "benchmark_result",
             "orch_step_id": step.id,
             "step_name": step.name,
-            "benchmark_id": step.benchmark_id,
+            "benchmark_id": benchmark_id,
             "score": score,
             "per_metric": result.get("per_metric", {}),
             "trace_count": result.get("trace_count", 0),
@@ -533,6 +566,9 @@ class ImproveRatchetDecideStepExecutor:
         mode = _mode(run)
         state = run.shared_state
         improve_run_id = state.get("improve_run_id")
+        threshold = _ratchet_threshold(step, run)
+        max_iterations = _ratchet_max_iterations(step, run)
+        plateau_patience = _ratchet_plateau_patience(step, run)
 
         iteration = int(state.get("_ratchet_iteration") or 0) + 1
         state["_ratchet_iteration"] = iteration
@@ -580,7 +616,7 @@ class ImproveRatchetDecideStepExecutor:
                          f"revert: {unreliable}"),
             )
         # Missing scores are treated as a failed improvement — revert (safe default).
-        decision = "keep" if (delta is not None and delta >= float(step.ratchet_threshold)) else "revert"
+        decision = "keep" if (delta is not None and delta >= threshold) else "revert"
 
         target_id = state.get("improve_target_id")
         reverted_to = None
@@ -600,7 +636,7 @@ class ImproveRatchetDecideStepExecutor:
                         version_n=baseline_n, score_delta=delta,
                         message=(f"Autonomous revert: delta "
                                  f"{delta if delta is not None else 'N/A'} < threshold "
-                                 f"{step.ratchet_threshold} — restored v{baseline_n}"),
+                                 f"{threshold} — restored v{baseline_n}"),
                     )
             except (applier.ApplyError, runs_mod.RunNotFound) as e:
                 yield {"type": "step_warning", "orch_step_id": step.id,
@@ -620,15 +656,15 @@ class ImproveRatchetDecideStepExecutor:
 
         # ── termination safeguards (5.12–5.16 / 5.22) ────────────────────────
         stop_reason = None
-        if iteration >= int(step.ratchet_max_iterations):
+        if iteration >= max_iterations:
             stop_reason = "max_iterations"
             _notify_inbox(
                 user_id, kind="max_iterations_stop", mode=mode,
                 run_id=improve_run_id, object_id=target_id,
                 message=f"Ratchet stopped: iteration cap "
-                        f"({step.ratchet_max_iterations}) reached",
+                        f"({max_iterations}) reached",
             )
-        elif consecutive >= int(step.ratchet_plateau_patience):
+        elif consecutive >= plateau_patience:
             stop_reason = "plateau"
             _notify_inbox(
                 user_id, kind="plateau_stop", mode=mode,
@@ -678,7 +714,7 @@ class ImproveRatchetDecideStepExecutor:
             "baseline_score": baseline,
             "new_score": new,
             "delta": delta,
-            "threshold": step.ratchet_threshold,
+            "threshold": threshold,
             "iteration": iteration,
             "consecutive_reverts": consecutive,
             "stop": stop_reason is not None,

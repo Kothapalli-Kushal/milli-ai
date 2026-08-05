@@ -1,5 +1,5 @@
 "use client";
-import { Settings, X, Shield, Trash, Cpu, Cloud, Database, LayoutGrid, Bot, Wrench, Server, FolderGit2, Workflow, ScrollText, MessageSquare, DollarSign, Clock, ArrowLeftRight, Vault, LifeBuoy, Key } from 'lucide-react';
+import { Settings, X, Shield, Trash, Cpu, Cloud, Database, LayoutGrid, Bot, Wrench, Server, FolderGit2, Workflow, ScrollText, MessageSquare, DollarSign, Clock, ArrowLeftRight, Vault, LifeBuoy, Key, FlaskConical } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -7,6 +7,7 @@ const tabs = [
     { id: 'general', label: 'General', icon: LayoutGrid },
     { id: 'personal_details', label: 'Personal Details', icon: Shield },
     { id: 'orchestrations', label: 'Orchestrations', icon: Workflow },
+    { id: 'fine_tuning', label: 'Fine-Tuning', icon: FlaskConical },
     { id: 'agents', label: 'Build Agents', icon: Bot },
     { id: 'mcp_servers', label: 'MCP Servers', icon: Server },
     { id: 'custom_tools', label: 'Tool Builder', icon: Wrench },
@@ -38,13 +39,11 @@ export default function SettingsLayout({
 
     const [messagingEnabled, setMessagingEnabled] = useState(false);
     const [codingEnabled, setCodingEnabled] = useState(false);
-    const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-
-    // Read persisted theme AFTER hydration to avoid SSR mismatch
-    useEffect(() => {
-        const saved = localStorage.getItem('synapseTheme') as 'dark' | 'light' | null;
-        if (saved) setTheme(saved);
-    }, []);
+    const [theme] = useState<'dark' | 'light'>(() => {
+        if (typeof window === 'undefined') return 'dark';
+        const saved = localStorage.getItem('synapseTheme');
+        return saved === 'light' ? 'light' : 'dark';
+    });
 
     useEffect(() => {
         // Quick fetch just to conditionally render tabs, or we can just render all tabs locally

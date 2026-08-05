@@ -345,15 +345,6 @@ class ToolStepExecutor:
             try:
                 tool_sys_prompt = "You are a tool-calling assistant. Output ONLY valid JSON."
                 tool_sys_prompt = _inject_db_context(active_agent, tool_sys_prompt)
-                print(
-                    f"DEBUG TOOL STEP: step={step.id} agent_id={step.agent_id!r} "
-                    f"active_agent_keys={list(active_agent.keys())} "
-                    f"active_agent_type={active_agent.get('type')!r} "
-                    f"active_agent_db_configs={active_agent.get('db_configs')} "
-                    f"sys_prompt_has_LINKED_DATABASES={'### LINKED DATABASES ###' in tool_sys_prompt} "
-                    f"sys_prompt_len={len(tool_sys_prompt)}",
-                    flush=True,
-                )
                 if system_prompt_prefix:
                     tool_sys_prompt = system_prompt_prefix + "\n\n" + tool_sys_prompt
                 response = await llm_generate(
