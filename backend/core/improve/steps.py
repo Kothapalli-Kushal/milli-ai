@@ -148,6 +148,7 @@ def grading_detail(result: dict) -> dict:
         "outcome_na": result.get("outcome_na"),
         "extraction_failed_rate": result.get("extraction_failed_rate"),
         "snapshot_id": result.get("snapshot_id"),
+        "sql_memory_generation": result.get("sql_memory_generation"),
         "benchmark_run_id": result.get("run_id"),
         "scores_by_split": result.get("scores_by_split"),
         "scores_by_fold": result.get("scores_by_fold"),
@@ -212,6 +213,14 @@ def comparability_reason(baseline: dict | None, new: dict | None) -> str | None:
         return (
             "rubric content_hash changed between runs — the rubric was edited "
             "mid-ratchet, so the two scores were measured with different rulers"
+        )
+    if (baseline.get("sql_memory_generation") or None) != (
+        new.get("sql_memory_generation") or None
+    ):
+        return (
+            "SQL schema memory advanced between runs — memory content is part "
+            "of the agent's effective configuration, so the two scores were "
+            "measured with different rulers"
         )
     return None
 

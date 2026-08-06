@@ -15,6 +15,12 @@ backend/data/chroma_db/
 backend/data/*
 backend/.playwright-mcp/
 
+# SQL schema memory — SQLite store + WAL sidecars (any DATA_DIR location)
+sql_memory.sqlite3
+sql_memory.sqlite3-wal
+sql_memory.sqlite3-shm
+sql_memory.freeze
+
 # Javascript / Frontend
 frontend/node_modules/
 frontend/.next/

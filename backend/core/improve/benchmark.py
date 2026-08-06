@@ -876,21 +876,28 @@ async def run_benchmark(
     ids: set[str] = set()
     exec_id_to_input: dict[str, str] = {}
     input_errors: list[str] = []
-    for i, item in enumerate(benchmark.inputs):
-        exec_id = f"{result_run_id}_{i}"
-        ids.add(exec_id)
-        exec_id_to_input[exec_id] = item.id or f"in_{i + 1:03d}"
-        try:
-            if target_kind == "agent":
-                await _execute_agent_input(
-                    config, item.prompt, exec_id, item.images, server_module
-                )
-            else:
-                await _execute_orchestration_input(
-                    config, item.prompt, exec_id, server_module
-                )
-        except Exception as e:  # input failure is data, not a crash
-            input_errors.append(f"input[{i}]: {type(e).__name__}: {e}")
+    # HARD INVARIANT (SQL memory spec §7): schema memory is FROZEN for every
+    # run with source="benchmark". If memory accumulated across benchmark
+    # inputs, input 5 in run 1 would see different memory than input 5 in
+    # run 2 — score drift indistinguishable from an agent regression, which
+    # breaks the 6.27 exact-reproducibility guarantee. Not a config flag.
+    from tools.sql_memory import freeze_writes as _sql_memory_freeze
+    with _sql_memory_freeze(result_run_id):
+        for i, item in enumerate(benchmark.inputs):
+            exec_id = f"{result_run_id}_{i}"
+            ids.add(exec_id)
+            exec_id_to_input[exec_id] = item.id or f"in_{i + 1:03d}"
+            try:
+                if target_kind == "agent":
+                    await _execute_agent_input(
+                        config, item.prompt, exec_id, item.images, server_module
+                    )
+                else:
+                    await _execute_orchestration_input(
+                        config, item.prompt, exec_id, server_module
+                    )
+            except Exception as e:  # input failure is data, not a crash
+                input_errors.append(f"input[{i}]: {type(e).__name__}: {e}")
 
     collected = _collect_traces(user_id, target_kind, target_id, ids)
     scored = score_traces([t for _, t in collected], benchmark.scorer.metrics)
@@ -939,12 +946,21 @@ async def run_benchmark(
             float(scorer.get("process_weight", 1.0)),
             float(scorer.get("outcome_weight", 0.0)),
         )
+        # SQL memory generation (spec §7 corollary): memory content is part of
+        # the agent's effective configuration. A baseline recorded against
+        # memory state A is not comparable with a new score against state B.
+        from tools.sql_memory import generation as _sql_memory_generation
+        try:
+            memory_generation = _sql_memory_generation(env.get("connection_id"))
+        except Exception:
+            memory_generation = None
         result.update({
             "schema_version": schema_version,
             "process_score": scored["score"],
             "outcome_score": graded["outcome_score"],
             "composite_score": composite,
             "score": composite,   # the ratchet compares composites for v2
+            "sql_memory_generation": memory_generation,
             "grading_mode": raw.get("grading_mode"),
             "grading_strictness": raw.get("grading_strictness")
                                   or derive_strictness(raw),

@@ -11,6 +11,14 @@ from urllib.parse import unquote
 from sqlalchemy import create_engine, text
 from core.config import load_settings, DATA_DIR
 
+# SQL schema memory (additive subsystem — see ideas/IMPLEMENT_SQL Memory Tool.md).
+# Supports both import styles: `tools.sql_agent` (tests) and script execution
+# with backend root on PYTHONPATH (MCP stdio subprocess).
+try:
+    from tools import sql_memory
+except ImportError:  # pragma: no cover - script-style fallback
+    import sql_memory
+
 # Initialize MCP Server
 app = Server("sql-mcp-server")
 
@@ -167,6 +175,79 @@ async def list_tools() -> list[types.Tool]:
                     }
                 },
                 "required": ["query"]
+            }
+        ),
+        types.Tool(
+            name="get_table_info",
+            description=(
+                "Retrieve stored schema memory (business meaning, units, sentinel "
+                "values, join paths, pitfalls, database-wide conventions) for the "
+                "tables you are about to query. Call this BEFORE writing SQL. "
+                "Entries labelled 'unverified' are unconfirmed hypotheses; entries "
+                "labelled STALE predate a schema change — verify before relying on "
+                "them. Provide db_id when multiple databases are linked."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    **db_id_prop,
+                    "table_names": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Tables about to be queried."
+                    },
+                    "kinds": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": ["table_note", "column_note", "join_path",
+                                     "convention", "pitfall", "query_exemplar"]
+                        },
+                        "description": "Optional filter over the six memory kinds."
+                    }
+                },
+                "required": ["table_names"]
+            }
+        ),
+        types.Tool(
+            name="set_table_info",
+            description=(
+                "Store one durable fact about a database object — call ONLY after "
+                "a query has returned confirmed-correct results. One fact per "
+                "call. Store business meaning a schema dump cannot tell you "
+                "(grain, units, sentinel values, undeclared join keys, required "
+                "filters, past mistakes) — NEVER the column list or types (free "
+                "from get_table_schema), never the user's question or a one-off "
+                "query result, and never credentials or PII. Subjects: "
+                "table_note/pitfall use 'schema.table'; column_note uses "
+                "'schema.table.column'; join_path uses 'schema.a~schema.b'; "
+                "convention uses a short slug. Provide db_id when multiple "
+                "databases are linked."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    **db_id_prop,
+                    "kind": {
+                        "type": "string",
+                        "enum": ["table_note", "column_note", "join_path",
+                                 "convention", "pitfall", "query_exemplar"],
+                        "description": "What kind of fact this is."
+                    },
+                    "subject": {
+                        "type": "string",
+                        "description": "The database object the fact is about (see kind-specific forms above)."
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The fact, max 1200 chars."
+                    },
+                    "payload": {
+                        "type": "object",
+                        "description": "Optional kind-specific structured detail (e.g. {\"on\": ..., \"cardinality\": ...} for join_path, {\"sql\": ...} for query_exemplar)."
+                    }
+                },
+                "required": ["kind", "subject", "content"]
             }
         )
     ]
@@ -338,6 +419,32 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent | type
                     )]
 
             text_out = await asyncio.to_thread(_run_sql_query, engine, query)
+            return [types.TextContent(type="text", text=text_out)]
+
+        elif name == "get_table_info":
+            mem_db_id = sql_memory.resolve_db_id(db_id, _load_db_configs())
+            text_out = await asyncio.to_thread(
+                sql_memory.get_entries,
+                mem_db_id,
+                arguments.get("table_names", []),
+                arguments.get("kinds") or None,
+                engine,
+                db,
+            )
+            return [types.TextContent(type="text", text=text_out)]
+
+        elif name == "set_table_info":
+            mem_db_id = sql_memory.resolve_db_id(db_id, _load_db_configs())
+            text_out = await asyncio.to_thread(
+                sql_memory.set_entry,
+                mem_db_id,
+                arguments.get("kind", ""),
+                arguments.get("subject", ""),
+                arguments.get("content", ""),
+                arguments.get("payload") or None,
+                engine,
+                db,
+            )
             return [types.TextContent(type="text", text=text_out)]
 
         else:

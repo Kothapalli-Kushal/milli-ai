@@ -475,3 +475,87 @@ otherwise indistinguishable from an agent regression.
 inbox entry and treats the iteration as `revert` (the CP5 safe default for a
 missing or incomparable score). Silently comparing across rubric versions is
 the subtlest way this subsystem can lie to you.
+
+---
+
+## 9. SQL Schema Memory (post-CP6 additive subsystem)
+
+Spec: `ideas/IMPLEMENT_SQL Memory Tool.md`. Module: `tools/sql_memory.py`.
+Durable, keyed, outcome-gated knowledge about linked databases — what a table's
+grain is, what a column means, undeclared join keys, required filters, past
+mistakes — read by the NL2SQL agent before writing a query, promoted only after
+a run is confirmed correct.
+
+### 9.1 Storage
+
+One SQLite file: `{DATA_DIR}/sql_memory.sqlite3` (WAL mode — expect
+`.sqlite3-wal` / `.sqlite3-shm` sidecars; all three are gitignored).
+Per-call connections with `busy_timeout=10000`; safe from `asyncio.to_thread`
+workers. Durability follows `DATA_DIR`: if it is not a mounted volume, memory
+silently resets on container rebuild — verify the mount. Backup with
+`sqlite3 sql_memory.sqlite3 ".backup out.db"`, never `cp` a live WAL database.
+Plaintext on disk: no credentials, connection strings, or PII may be stored.
+
+```
+memory(id PK, db_id, kind, subject, content, payload, schema_fp,
+       verified, uses, successes, source_run_id,
+       created_at, updated_at, superseded_by)
+UNIQUE (db_id, kind, subject) WHERE superseded_by IS NULL
+```
+
+Rows are never deleted: an update supersedes the prior row (preserving
+`created_at`); `mark_verified(..., success=False)` supersedes with the
+`__discarded__` tombstone. Six kinds (`table_note`, `column_note`, `join_path`,
+`convention`, `pitfall`, `query_exemplar`) addressed canonically
+(lowercased, `dbo`-qualified, join sides sorted, conventions slugged,
+exemplars keyed on `sha256(question.lower())[:16]`). Malformed addresses are
+rejected with an explanatory error, never coerced.
+
+`schema_fp` is sha256 over `name:type:is_nullable` per column (ordered by
+`column_id`, same `sys.columns` join as `get_table_schema`), truncated to 32
+hex. Retrieval recomputes it and labels a mismatch **STALE**. The subsystem
+reads target databases only for fingerprinting — it never issues DDL/DML
+against `db_configs.json` targets.
+
+### 9.2 Tools and gating
+
+Two tools on the existing `sql-mcp-server`: `get_table_info` (ranked
+`verified DESC, successes DESC, updated_at DESC`; hard 4000-char budget;
+conventions returned unconditionally; increments `uses`) and `set_table_info`
+(upsert on the canonical address; 1200-char content cap; lands `verified: 0`,
+served labelled `unverified`). With memory tools unused, the three existing
+SQL tools are byte-identical to their pre-memory behavior.
+
+Promotion is **not agent-reachable**: `sql_memory.mark_verified` /
+`mark_run_outcome` are module functions called from the post-run path (CP6
+outcome grading or explicit user confirmation), never exposed as MCP tools.
+
+### 9.3 Benchmark interaction
+
+`run_benchmark` wraps input execution in `sql_memory.freeze_writes(...)` — a
+hard invariant in code, not a config flag. Frozen mode (env
+`SYNAPSE_SQL_MEMORY_MODE=frozen` **or** the `{DATA_DIR}/sql_memory.freeze`
+marker file, which crosses the process boundary to the long-lived MCP
+subprocess) makes writes a no-op while reads still work, so memory cannot
+drift across benchmark inputs (checklist 6.27's exact-reproducibility
+guarantee).
+
+v2 result records carry `sql_memory_generation` (max `updated_at` for the
+benchmark's `execution_env.connection_id`, global max when unset, `null` when
+the store is empty). `IMPROVE_RATCHET_DECIDE` treats a generation change
+between baseline and new as `grading_mismatch` (§8.8): memory content is part
+of the agent's effective configuration, and two scores measured against
+different memory states used different rulers. v1 records are unchanged (kept
+to exactly the CP4 field set).
+
+### 9.4 Known deviations (from the spec, recorded deliberately)
+
+- The store is flat, not per-user: the SQL MCP server is a stdio process with
+  no user context and no `resolve_improve_user` equivalent.
+- `query_exemplar` retrieval matches only on exact question hash; semantic
+  retrieval via ChromaDB is deferred until there are a few hundred verified
+  exemplars.
+- Keep `convention` entries to roughly six — they are returned on every
+  retrieval and a large set starves the table-specific entries.
+- Inspection is `sqlite3` for v1; no memory editor UI.
+
