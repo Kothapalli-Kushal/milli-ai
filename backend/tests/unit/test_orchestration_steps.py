@@ -11,6 +11,7 @@ import types
 import pytest
 
 from _fakes import seed as S
+from core.orchestration.steps import _merge_table_schema_context
 
 
 def _server_module():
@@ -18,15 +19,81 @@ def _server_module():
     return types.SimpleNamespace(agent_sessions={}, memory_store=None, tool_router={})
 
 
-async def _run(orch_dict, initial_input="hello"):
+def test_later_table_schema_expands_schema_context():
+    original = """RELEVANT TABLES:
+- dbo.tblFundLiabilityValue: original fact table
+NOTES:
+- dbo.tblFundFCLValue may be relevant but has not been inspected.
+"""
+    tool_output = """**Table: dbo.tblFundFCLValue**
+Columns:
+- FundFCLValueID (int) NOT NULL (PK)
+- FundID (int) NOT NULL
+
+**Table: dbo.tblFundLiabilityValue**
+Columns:
+- FundLiabilityValueID (int) NOT NULL (PK)"""
+
+    merged = _merge_table_schema_context(original, tool_output)
+
+    assert "**Table: dbo.tblFundFCLValue**" in merged
+    assert "FundFCLValueID (int)" in merged
+    assert "**Table: dbo.tblFundLiabilityValue**" not in merged
+    assert _merge_table_schema_context(merged, tool_output) == merged
+
+
+async def _run(orch_dict, initial_input="hello", initial_state=None):
     from core.models_orchestration import Orchestration
     from core.orchestration.engine import OrchestrationEngine
     orch = Orchestration.model_validate(orch_dict)
     engine = OrchestrationEngine(orch, _server_module())
     events = []
-    async for ev in engine.run(initial_input, run_id=f"run_test_{orch.id}"):
+    async for ev in engine.run(
+        initial_input,
+        run_id=f"run_test_{orch.id}",
+        initial_state=initial_state,
+    ):
         events.append(ev)
     return events
+
+
+async def test_write_sql_schema_lookup_updates_shared_context(monkeypatch):
+    import core.react_engine as react_engine
+
+    agent = S.make_agent(type="code", tools=["get_table_schema"])
+    S.seed_agents([agent])
+    tool_output = """**Table: dbo.tblFundFCLValue**
+Columns:
+- FundFCLValueID (int) NOT NULL (PK)"""
+
+    async def fake_run_agent_step(**kwargs):
+        async for event in kwargs["post_tool_hook"]("get_table_schema", tool_output):
+            yield event
+        yield {"type": "final", "response": "ACTION: EXECUTE"}
+
+    monkeypatch.setattr(react_engine, "run_agent_step", fake_run_agent_step)
+    orch = S.make_orchestration(
+        entry_step_id="write_sql",
+        steps=[{
+            "id": "write_sql",
+            "name": "Write SQL",
+            "type": "agent",
+            "agent_id": agent["id"],
+            "prompt_template": "Inspect another table if needed.",
+            "output_key": "draft_sql",
+            "next_step_id": None,
+        }],
+    )
+
+    events = await _run(
+        orch,
+        initial_state={"schema_context": "RELEVANT TABLES:\n- dbo.aFund: fund lookup"},
+    )
+
+    update = next(event for event in events if event.get("type") == "schema_context_updated")
+    assert update["orch_step_id"] == "write_sql"
+    completed = next(event for event in events if event.get("type") == "orchestration_complete")
+    assert "**Table: dbo.tblFundFCLValue**" in completed["final_state"]["schema_context"]
 
 
 class TestPrintStep:

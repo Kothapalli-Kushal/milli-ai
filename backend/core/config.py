@@ -64,6 +64,9 @@ def load_settings():
         "local_compatible_base_url": "",
         "local_compatible_key": "",
         "local_compatible_models": "",
+        # Optional Ollama runtime context window override (tokens).
+        # Example: 131072 for phi4-mini-reasoning:3.8b.
+        "ollama_num_ctx": 0,
         "openai_compatible_embed_models": "",
         "local_compatible_embed_models": "",
         "huggingface_token": "",

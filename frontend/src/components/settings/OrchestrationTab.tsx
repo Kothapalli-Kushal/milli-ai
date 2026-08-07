@@ -1629,6 +1629,7 @@ function BottomPanel({
                                                 const key = field.name || `field_${idx}`;
                                                 const value = humanFieldValues[key] ?? '';
                                                 const isOptions = (field.type === 'options' || field.type === 'select') && Array.isArray(field.options) && field.options.length > 0;
+                                                const isLongText = field.type === 'text' && /explanation|reason|context|notes/i.test(field.name || field.label);
                                                 return (
                                                     <div key={key} className="space-y-1">
                                                         <label className="block text-[11px] text-amber-200">{field.label || field.name}</label>
@@ -1648,6 +1649,14 @@ function BottomPanel({
                                                                     );
                                                                 })}
                                                             </div>
+                                                        ) : isLongText ? (
+                                                            <textarea
+                                                                className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 text-xs text-zinc-200 outline-none resize-y"
+                                                                value={value}
+                                                                onChange={(e) => setHumanFieldValues(prev => ({ ...prev, [key]: e.target.value }))}
+                                                                placeholder="Add explanation or extra context..."
+                                                                rows={3}
+                                                            />
                                                         ) : (
                                                             <input
                                                                 className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1.5 text-xs text-zinc-200 outline-none"

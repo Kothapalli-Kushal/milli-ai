@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface FieldDefinition {
+  name?: string;
   label: string;
   type: string;
   options?: string[];
@@ -89,6 +90,7 @@ export function CollectDataForm({ data, onSubmit, onCancel }: CollectDataFormPro
         )}
         {data.fields.map((field, idx) => {
           const key = field.label || `field_${idx}`;
+          const isLongText = field.type === 'text' && /explanation|reason|context|notes/i.test(field.name || field.label);
           
           return (
             <div key={idx}>
@@ -118,6 +120,14 @@ export function CollectDataForm({ data, onSubmit, onCancel }: CollectDataFormPro
                     </button>
                   ))}
                 </div>
+              ) : isLongText ? (
+                <textarea
+                  value={values[key] || ''}
+                  onChange={(e) => setValue(key, e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-700 text-white px-4 py-2 text-sm focus:outline-none focus:border-white transition-colors resize-y"
+                  placeholder="Add explanation or extra context..."
+                  rows={3}
+                />
               ) : (
                 <input
                   type={
