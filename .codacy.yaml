@@ -1,4 +1,4 @@
----
+﻿---
 # Codacy configuration — controls both API-upload scans and Actions workflow scans.
 # Stack: Python backend + TypeScript/Next.js frontend + Docker
 engines:
@@ -74,7 +74,7 @@ exclude_paths:
   - backend/logs/**
   - dist/**
   - frontend-build/**
-  - synapse/_frontend/**
+  - milli/_frontend/**
   - "**/__pycache__/**"
   - "**/*.egg-info/**"
   # Test code: asserts (B101) and dummy/fake credentials are expected here and

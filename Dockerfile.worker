@@ -1,4 +1,4 @@
-# Synapse Worker Image
+﻿# Milli Worker Image
 # Runs ARQ jobs that execute OrchestrationEngine and agent chat turns.
 # Does NOT include the frontend or playwright browser automation.
 FROM python:3.13-slim
@@ -20,7 +20,7 @@ COPY backend/tools ./tools
 COPY backend/worker_main.py .
 
 ENV PYTHONPATH=/app/backend
-ENV SYNAPSE_DATA_DIR=/data
+ENV MILLI_DATA_DIR=/data
 
 # Core connection URLs (required for scale mode)
 ENV REDIS_URL=""
@@ -44,7 +44,7 @@ ENV PGBOUNCER_MODE=0
 # S3 storage (vault + execution logs)
 ENV S3_BUCKET=""
 ENV S3_REGION=us-east-1
-ENV S3_PREFIX=synapse
+ENV S3_PREFIX=milli
 ENV S3_ACCESS_KEY_ID=""
 ENV S3_SECRET_ACCESS_KEY=""
 ENV S3_ENDPOINT_URL=""

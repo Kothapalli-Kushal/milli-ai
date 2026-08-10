@@ -384,6 +384,8 @@ class ImproveReviewStepExecutor:
             "orch_step_id": step.id,
             "prompt": prompt,
             "fields": fields,
+            "proposed_diff": diff,
+            "improve_run_id": run.shared_state.get("improve_run_id"),
             "run_id": run.run_id,
             "agent_context": None,
             "channel_id": None,

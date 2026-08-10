@@ -1,5 +1,5 @@
-"""
-Convert an OpenAPI 3.x / Swagger 2.0 spec into Synapse custom-tool dicts.
+﻿"""
+Convert an OpenAPI 3.x / Swagger 2.0 spec into Milli custom-tool dicts.
 
 Each spec operation (path + HTTP method) becomes one HTTP custom tool that plugs
 directly into the existing executor in react_engine.py:

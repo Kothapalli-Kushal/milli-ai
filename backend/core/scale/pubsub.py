@@ -1,12 +1,12 @@
-"""
+﻿"""
 Redis Streams + key-based pub/sub for the scale layer.
 
 Channel/key conventions:
-  synapse:run:{run_id}:events     Redis Stream — worker publishes SSE events; API server reads
-  synapse:cancel:{run_id}         Redis SET key (1h TTL) — API server sets; worker polls
-  synapse:human_input:{run_id}    Redis SET key (1h TTL) — API server sets; worker polls
-  synapse:chat:{session_id}:events Redis Stream — worker publishes chat SSE events
-  synapse:workers:heartbeat       Pub/Sub channel — workers publish heartbeat blobs
+  milli:run:{run_id}:events     Redis Stream — worker publishes SSE events; API server reads
+  milli:cancel:{run_id}         Redis SET key (1h TTL) — API server sets; worker polls
+  milli:human_input:{run_id}    Redis SET key (1h TTL) — API server sets; worker polls
+  milli:chat:{session_id}:events Redis Stream — worker publishes chat SSE events
+  milli:workers:heartbeat       Pub/Sub channel — workers publish heartbeat blobs
 """
 import json
 import time
@@ -46,7 +46,7 @@ class RunEventPublisher:
     def __init__(self, redis_client, run_id: str, ttl: int = 3600):
         self._redis = redis_client
         self._run_id = run_id
-        self._key = f"synapse:run:{run_id}:events"
+        self._key = f"milli:run:{run_id}:events"
         self._ttl = ttl
 
     async def publish(self, event: dict) -> None:
@@ -81,7 +81,7 @@ class ChatEventPublisher:
     def __init__(self, redis_client, session_id: str, ttl: int = 3600):
         self._redis = redis_client
         self._session_id = session_id
-        self._key = f"synapse:chat:{session_id}:events"
+        self._key = f"milli:chat:{session_id}:events"
         self._ttl = ttl
 
     async def publish(self, event: dict) -> None:
@@ -108,19 +108,19 @@ class ChatEventPublisher:
 
 async def publish_cancellation(redis_client, run_id: str, ttl: int = 3600) -> None:
     """Signal a worker to cancel the given run."""
-    key = f"synapse:cancel:{run_id}"
+    key = f"milli:cancel:{run_id}"
     await redis_client.set(key, "1", ex=ttl)
 
 
 async def is_cancelled(redis_client, run_id: str) -> bool:
     """Check whether a cancellation signal exists for run_id."""
-    key = f"synapse:cancel:{run_id}"
+    key = f"milli:cancel:{run_id}"
     val = await redis_client.get(key)
     return bool(val)
 
 
 async def clear_cancellation(redis_client, run_id: str) -> None:
-    await redis_client.delete(f"synapse:cancel:{run_id}")
+    await redis_client.delete(f"milli:cancel:{run_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ async def publish_human_input(
     response: dict,
     ttl: int = 3600,
 ) -> None:
-    key = f"synapse:human_input:{run_id}"
+    key = f"milli:human_input:{run_id}"
     await redis_client.set(key, json.dumps(response, default=str), ex=ttl)
 
 
@@ -144,7 +144,7 @@ async def get_human_input(
     timeout: float = 3600.0,
 ) -> dict | None:
     """Poll for human input. Returns the response dict or None on timeout."""
-    key = f"synapse:human_input:{run_id}"
+    key = f"milli:human_input:{run_id}"
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         import asyncio
@@ -172,4 +172,4 @@ async def publish_worker_heartbeat(
         "max_jobs": max_jobs,
         "ts": time.time(),
     })
-    await redis_client.publish("synapse:workers:heartbeat", payload)
+    await redis_client.publish("milli:workers:heartbeat", payload)

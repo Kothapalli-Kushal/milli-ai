@@ -1,4 +1,4 @@
-"""GitHub Copilot CLI — Agent Client Protocol (ACP) transport.
+﻿"""GitHub Copilot CLI — Agent Client Protocol (ACP) transport.
 
 Talks to `copilot --acp` over stdio using newline-delimited JSON-RPC 2.0.
 This bypasses the Windows argv limit that cripples the classic `copilot -p`
@@ -10,13 +10,13 @@ Design decisions for the initial cut:
   is spawned lazily on the first call and reused for the lifetime of the
   backend. If it dies we transparently respawn on the next call.
 
-* One ACP *session* per turn — create → prompt → drop. Synapse already builds
+* One ACP *session* per turn — create → prompt → drop. Milli already builds
   `full_prompt` with the entire conversation history baked in, so relying on
   Copilot's server-side session memory would double-count context. Fresh
   session per turn keeps semantics identical to the classic transport.
 
 * Copilot's native tools are disabled (`--available-tools=""`, `--allow-all`,
-  `--no-ask-user`) so it can only produce text. Synapse's XML `<tool_call>`
+  `--no-ask-user`) so it can only produce text. Milli's XML `<tool_call>`
   scaffolding inside `full_prompt` continues to work unchanged, and there are
   no permission prompts to handle.
 
@@ -90,7 +90,7 @@ class ACPClient:
 
         # `--acp` puts Copilot in JSON-RPC server mode.
         # `--allow-all --no-ask-user --available-tools=""` disables Copilot's
-        # native tools so it only produces text; Synapse handles tools via
+        # native tools so it only produces text; Milli handles tools via
         # the XML scaffolding already baked into `full_prompt`.
         cmd_args = [
             "--acp",
@@ -295,7 +295,7 @@ class ACPClient:
         """Send a single-turn prompt, return (assistant_text, session_id).
 
         Creates a fresh ACP session each call so history state stays in
-        Synapse's `full_prompt` — the single source of truth.
+        Milli's `full_prompt` — the single source of truth.
         """
         cwd = cwd or os.getcwd()
         async with self._prompt_lock:

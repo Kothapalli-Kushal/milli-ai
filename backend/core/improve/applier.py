@@ -1,5 +1,5 @@
-"""
-Diff applier + rollback for the Synapse Self-Improvement subsystem (CP3).
+﻿"""
+Diff applier + rollback for the Milli Self-Improvement subsystem (CP3).
 
 This is the SECOND, independent guardrail boundary (§0.5): the allow-list is
 re-declared and re-checked here, deliberately NOT imported from tuner.py, so

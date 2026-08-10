@@ -1,5 +1,5 @@
-"""
-Detector runner for the Synapse Self-Improvement subsystem (Checkpoint 2).
+﻿"""
+Detector runner for the Milli Self-Improvement subsystem (Checkpoint 2).
 
 Loads a user's trace files (the only I/O in this checkpoint — READ-only),
 joins compaction events from usage_tracker, runs every detector on every

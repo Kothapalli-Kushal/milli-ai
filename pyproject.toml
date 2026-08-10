@@ -1,11 +1,11 @@
-[build-system]
+﻿[build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "synapse-orch-ai"
+name = "milli-orch-ai"
 version = "1.8.2"
-description = "Synapse - A Multi Agent Orchestrator"
+description = "Milli - A Multi Agent Orchestrator"
 readme = "README.md"
 license = { text = "AGPL-3.0-only" }
 requires-python = ">=3.11,<3.14"
@@ -52,23 +52,23 @@ dependencies = [
 ]
 
 [project.scripts]
-synapse = "synapse.cli:main"
-"synapse-ai" = "synapse.cli:main"
+milli = "milli.cli:main"
+"milli-ai" = "milli.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/synapseorch-ai/synapse-ai"
-Repository = "https://github.com/synapseorch-ai/synapse-ai"
-Issues = "https://github.com/synapseorch-ai/synapse-ai/issues"
+Homepage = "https://github.com/synapseorch-ai/milli-ai"
+Repository = "https://github.com/synapseorch-ai/milli-ai"
+Issues = "https://github.com/synapseorch-ai/milli-ai/issues"
 
 [tool.hatch.build.hooks.custom]
 path = "hatch_build.py"
 
 [tool.hatch.build.targets.wheel]
 artifacts = [
-    "synapse/_frontend/**",
+    "milli/_frontend/**",
 ]
 include = [
-    "synapse/",
+    "milli/",
     "backend/core/",
     "backend/services/",
     "backend/tools/",
@@ -151,7 +151,7 @@ filterwarnings = [
 ]
 
 [tool.bandit]
-targets = ["backend", "synapse"]
+targets = ["backend", "milli"]
 exclude_dirs = [
     "backend/venv",
     "backend/.venv",

@@ -1,9 +1,9 @@
-"""
-Tuner for the Synapse Self-Improvement subsystem (Checkpoint 3).
+﻿"""
+Tuner for the Milli Self-Improvement subsystem (Checkpoint 3).
 
 Turns an insights report + the target object's current JSON config into a
 `ProposedDiff` — a reviewable, evidence-linked set of field edits — using
-Synapse's own LLM dispatch (`core.llm_providers.generate_response`). No
+Milli's own LLM dispatch (`core.llm_providers.generate_response`). No
 direct provider SDK calls, ever.
 
 Guardrails (CLAUDE.md §0.5, enforced here as the FIRST of two boundaries;
@@ -20,13 +20,15 @@ Guardrails (CLAUDE.md §0.5, enforced here as the FIRST of two boundaries;
 Attribution: the tuner system prompt below is derived from the SKILL.md of
 the `recursive-improve` project, licensed under the Apache License,
 Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0). Modifications:
-adapted to Synapse's agent/orchestration config schema, field allow-list,
+adapted to Milli's agent/orchestration config schema, field allow-list,
 and ProposedDiff output contract. Provided on an "AS IS" BASIS, WITHOUT
 WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 --------------------------------------------------------------------------
 """
 import json
 import re
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
@@ -66,6 +68,8 @@ ORCH_STEP_TUNABLE_FIELDS = {
 
 MAX_TUNER_PROMPT_CHARS = 24_000
 MAX_COMPACT_INSIGHTS = 20
+MAX_TUNER_DEBUG_TEXT_CHARS = 4000
+TUNER_RAW_DEBUG_RETENTION_HOURS = 6
 
 
 class TunerOutputError(Exception):
@@ -74,6 +78,81 @@ class TunerOutputError(Exception):
 
 class TargetNotFound(Exception):
     """The target agent/orchestration does not exist."""
+
+
+def _truncate_debug_text(value: str, limit: int = MAX_TUNER_DEBUG_TEXT_CHARS) -> str:
+    text = str(value or "")
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f"\n... [truncated {len(text) - limit} chars]"
+
+
+def _persist_tuner_failure_log(
+    *,
+    run_id: str,
+    model: str,
+    target_object_id: str,
+    target_kind: str,
+    prompt: str,
+    attempts: list[dict],
+    final_error: str,
+) -> str | None:
+    """Best-effort debug artifact for invalid tuner outputs.
+
+    Stored under backend/logs/improve_tuner_failures/<run_id>.json to make
+    schema/parse failures inspectable after orchestration completion.
+    """
+    try:
+        base_dir = Path(__file__).resolve().parents[2]
+        out_dir = base_dir / "logs" / "improve_tuner_failures"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path = out_dir / f"{run_id}.json"
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "run_id": run_id,
+            "target_object_id": target_object_id,
+            "target_kind": target_kind,
+            "model": model,
+            "final_error": final_error,
+            "prompt_preview": _truncate_debug_text(prompt),
+            "attempts": attempts,
+        }
+        with out_path.open("w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+        return str(out_path)
+    except Exception:
+        return None
+
+
+def _cleanup_old_raw_tuner_debug_files(raw_dir: Path) -> None:
+    """Best-effort cleanup for temporary raw tuner debug payloads."""
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=TUNER_RAW_DEBUG_RETENTION_HOURS)
+    for path in raw_dir.glob("*.txt"):
+        try:
+            modified = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+            if modified < cutoff:
+                path.unlink(missing_ok=True)
+        except Exception:
+            continue
+
+
+def _persist_raw_tuner_output(
+    *,
+    run_id: str,
+    attempt: int,
+    raw_output: str,
+) -> str | None:
+    """Persist the full raw model output for one attempt in a temp file."""
+    try:
+        base_dir = Path(__file__).resolve().parents[2]
+        raw_dir = base_dir / "logs" / "improve_tuner_failures" / "raw"
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        _cleanup_old_raw_tuner_debug_files(raw_dir)
+        out_path = raw_dir / f"{run_id}_attempt{attempt}.txt"
+        out_path.write_text(str(raw_output or ""), encoding="utf-8")
+        return str(out_path)
+    except Exception:
+        return None
 
 
 # ── ProposedDiff schema (checklist 3.4 — all five components) ────────────────
@@ -140,7 +219,7 @@ TUNER_SYSTEM_PROMPT = """You are a configuration tuner for AI agents and orchest
 You analyze behavioral insights extracted from execution traces and propose minimal, \
 targeted edits to the target's JSON configuration that address the observed problems.
 
-Principles (from recursive-improve, adapted to Synapse):
+Principles (from recursive-improve, adapted to Milli):
 - Ground every proposed edit in specific evidence from the insights. Never invent problems.
 - Prefer the smallest change that plausibly fixes the highest-severity finding.
 - Improve instructions (system prompts / prompt templates) before changing structure.
@@ -151,7 +230,11 @@ Principles (from recursive-improve, adapted to Synapse):
 You may ONLY edit fields in the allow-list given in the user message. Never propose edits \
 to code files, credentials, MCP or database configuration, or any field outside the allow-list.
 
-Respond with a single JSON object and nothing else (no prose, no code fences), exactly this shape:
+Respond with a single STRICT JSON object and nothing else. Requirements:
+- Use double quotes for ALL keys and string values (RFC 8259 compliant)
+- No single quotes, no unquoted keys, no trailing commas, no comments
+- No markdown, no code fences, no prose before or after
+Exactly this shape:
 {
   "target_object_id": "<id>",
   "target_kind": "agent" | "orchestration",
@@ -266,13 +349,21 @@ def build_tuner_prompt(
 def parse_tuner_output(raw: str) -> dict:
     """Extract and load the first JSON object from the model's response."""
     text = (raw or "").strip()
-    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-    if fence:
-        text = fence.group(1).strip()
+    # Only unwrap fenced output when the entire response is wrapped in one
+    # markdown code block. Do not search for fences anywhere in the body,
+    # because JSON string values may legitimately contain ```python ... ```.
+    fenced = re.match(r"^```(?:json)?\s*([\s\S]*?)\s*```$", text)
+    if fenced:
+        text = fenced.group(1).strip()
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end <= start:
         raise ValueError("no JSON object found in tuner output")
-    return json.loads(text[start : end + 1])
+    candidate = text[start : end + 1]
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        import json5
+        return json5.loads(candidate)
 
 
 # ── Target loading ────────────────────────────────────────────────────────────
@@ -437,6 +528,7 @@ async def _call_tuner_with_retry(
     llm_mode = detect_mode_from_model(model)
     attempt_prompt = prompt
     last_error = ""
+    attempt_debug: list[dict] = []
     for attempt in range(2):
         raw = await generate_response(
             prompt_msg=attempt_prompt,
@@ -447,6 +539,16 @@ async def _call_tuner_with_retry(
             source="improve_tuner",
             run_id=run_id,
         )
+        attempt_info = {
+            "attempt": attempt + 1,
+            "prompt_preview": _truncate_debug_text(attempt_prompt),
+            "raw_output_preview": _truncate_debug_text(raw),
+            "raw_output_file": _persist_raw_tuner_output(
+                run_id=run_id,
+                attempt=attempt + 1,
+                raw_output=raw,
+            ),
+        }
         try:
             data = parse_tuner_output(raw)
             # Never trust the model with its own routing.
@@ -455,6 +557,7 @@ async def _call_tuner_with_retry(
             validated = ProposedDiff.model_validate(data)
         except (ValueError, ValidationError) as e:
             last_error = f"output failed schema validation: {e}"
+            attempt_info["validation_error"] = last_error
         else:
             violations = validate_field_edits(
                 [fe.model_dump() for fe in validated.field_edits],
@@ -464,6 +567,8 @@ async def _call_tuner_with_retry(
             if not violations:
                 return validated.model_dump()
             last_error = "out-of-scope field edits: " + "; ".join(violations)
+            attempt_info["validation_error"] = last_error
+        attempt_debug.append(attempt_info)
         if attempt == 0:
             attempt_prompt = (
                 prompt
@@ -471,4 +576,15 @@ async def _call_tuner_with_retry(
                 + last_error
                 + "\nRespond again with a corrected JSON object only."
             )
+    failure_log_path = _persist_tuner_failure_log(
+        run_id=run_id,
+        model=model,
+        target_object_id=target_object_id,
+        target_kind=target_kind,
+        prompt=prompt,
+        attempts=attempt_debug,
+        final_error=last_error,
+    )
+    if failure_log_path:
+        raise TunerOutputError(f"{last_error} (debug log: {failure_log_path})")
     raise TunerOutputError(last_error)

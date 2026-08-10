@@ -1,4 +1,4 @@
-"""
+﻿"""
 Orchestration management endpoints: CRUD, run, human-input, cancel.
 """
 import asyncio
@@ -314,9 +314,9 @@ async def submit_human_input(run_id: str, request: Request):
                 import os as _os
                 _scale_cfg = _get_scale_cfg()
                 _queue_name = (
-                    f"synapse:orchestrations:{row.tenant_id or _scale_cfg.default_tenant_id}"
+                    f"milli:orchestrations:{row.tenant_id or _scale_cfg.default_tenant_id}"
                     if _scale_cfg.enable_tenant_isolation
-                    else f"synapse:orchestrations:{_os.getenv('WORKER_QUEUE_SHARD', 'default')}"
+                    else f"milli:orchestrations:{_os.getenv('WORKER_QUEUE_SHARD', 'default')}"
                 )
                 resp = human_response if isinstance(human_response, dict) else {"response": human_response}
                 await publish_human_input(redis, run_id, resp)

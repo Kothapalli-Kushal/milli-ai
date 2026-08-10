@@ -1,4 +1,4 @@
-"""
+﻿"""
 ARQ worker definition.
 Defines the job functions and WorkerSettings class consumed by `arq run_worker`.
 Entry point: backend/worker_main.py
@@ -596,7 +596,7 @@ async def worker_shutdown(ctx: dict) -> None:
 
 _cfg = get_scale_config()
 
-QUEUE_NAME = f"synapse:orchestrations:{os.getenv('WORKER_QUEUE_SHARD', 'default')}"
+QUEUE_NAME = f"milli:orchestrations:{os.getenv('WORKER_QUEUE_SHARD', 'default')}"
 
 
 def _build_redis_settings() -> RedisSettings:

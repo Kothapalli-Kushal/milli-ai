@@ -1,4 +1,4 @@
-# Synapse Self-Improvement — Trace Schema & Storage Layout (Checkpoint 1)
+﻿# Milli Self-Improvement — Trace Schema & Storage Layout (Checkpoint 1)
 
 Status: Checkpoint 1. This document is the authoritative reference for the
 trace JSON schema, the per-user storage layout, the ACL map, retention, and
@@ -9,8 +9,8 @@ the success-derivation rule.
 ## 1. Trace schema
 
 One JSON file per agent run / orchestration run ("session"). The schema is a
-Synapse-native superset of the recursive-improve (RI) trace schema — every RI
-field is present with the same name and meaning; Synapse adds `kind`, the
+Milli-native superset of the recursive-improve (RI) trace schema — every RI
+field is present with the same name and meaning; Milli adds `kind`, the
 `usage` aggregate, and extra `metadata` keys.
 
 ```jsonc
@@ -54,7 +54,7 @@ field is present with the same name and meaning; Synapse adds `kind`, the
     }
   ],
 
-  // ── cost (Synapse extension; joined, never re-counted) ──────────────────
+  // ── cost (Milli extension; joined, never re-counted) ──────────────────
   "usage": {
     "input_tokens":       0,
     "output_tokens":      0,
@@ -106,7 +106,7 @@ rewritten — and keeps the `compaction_thrash` detector a pure function.
 
 ## 2. Per-user storage layout
 
-All improvement storage is namespaced by user id (§0.6.5). Synapse's login
+All improvement storage is namespaced by user id (§0.6.5). Milli's login
 gate is single-username; `user_id` resolves to `settings.login_username`, or
 `"default"` when the gate is disabled.
 
@@ -343,7 +343,7 @@ not by a model's opinion.
 ```
 
 - Sits at the **benchmark** level; per-input override allowed.
-- Resolves an **existing** Synapse SQL connection via
+- Resolves an **existing** Milli SQL connection via
   `tools/sql_agent.py::get_db_engine`. CP6 introduces no connection manager, no
   credential storage, and no DB config.
 - **Multiset by default.** `order_sensitive: "auto" | true | false`; `auto`
@@ -389,7 +389,7 @@ improve/<user_id>/rubrics/index.json              # id → latest version, name,
 improve/<user_id>/judge_cache/<hash>.json         # verdict cache entries
 ```
 
-`rubrics.py` is the **single authoritative Rubric registry for Synapse**. The
+`rubrics.py` is the **single authoritative Rubric registry for Milli**. The
 Training-tab concept of a flat `data/rubrics.json` is **superseded** — do not
 create it; a shared flat file cannot satisfy §0.6.5's per-user auth-scoping
 constraint. Public API: `get_rubric`, `list_rubrics`, `save_rubric`,
@@ -534,7 +534,7 @@ outcome grading or explicit user confirmation), never exposed as MCP tools.
 
 `run_benchmark` wraps input execution in `sql_memory.freeze_writes(...)` — a
 hard invariant in code, not a config flag. Frozen mode (env
-`SYNAPSE_SQL_MEMORY_MODE=frozen` **or** the `{DATA_DIR}/sql_memory.freeze`
+`MILLI_SQL_MEMORY_MODE=frozen` **or** the `{DATA_DIR}/sql_memory.freeze`
 marker file, which crosses the process boundary to the long-lived MCP
 subprocess) makes writes a no-op while reads still work, so memory cannot
 drift across benchmark inputs (checklist 6.27's exact-reproducibility

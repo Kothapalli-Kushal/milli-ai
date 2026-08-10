@@ -1,5 +1,5 @@
-"""
-Outcome grading for the Synapse Self-Improvement subsystem (Checkpoint 6).
+﻿"""
+Outcome grading for the Milli Self-Improvement subsystem (Checkpoint 6).
 
 CP1-CP5 measure *how the agent behaved* (detector/process metrics). This module
 adds the second axis: *what it should have produced*. There is exactly ONE

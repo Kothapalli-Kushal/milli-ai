@@ -1,4 +1,4 @@
-"""
+﻿"""
 LLM judge for rubric-mode grading and `semantic_match` (Checkpoint 6, §6.4).
 
 There is exactly ONE judging implementation. `semantic_match` (§6.3.6) reuses
@@ -163,7 +163,7 @@ def parse_verdict(raw: str) -> dict | None:
 class JudgeSession:
     """One pinned judge for one benchmark run.
 
-    Synchronous facade over Synapse's async `generate_response` — grading runs
+    Synchronous facade over Milli's async `generate_response` — grading runs
     after all inputs have executed, so there is no event loop contention, and a
     sync facade keeps `grading.py` free of async plumbing for the deterministic
     path (which never touches a judge at all).

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Import / Export endpoints for orchestrations, agents, MCP servers, and custom tools.
 
 Export:
@@ -115,7 +115,7 @@ async def export_bundle(req: ExportRequest):
     has_python_tools = any(t.get("tool_type") == "python" for t in selected_tools)
 
     bundle = {
-        "synapse_export": True,
+        "milli_export": True,
         "version": "1.0",
         "exported_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "has_python_tools": has_python_tools,
@@ -151,7 +151,7 @@ class ImportRequest(BaseModel):
 @router.post("/api/import")
 async def import_bundle(req: ImportRequest):
     """
-    Import a Synapse export bundle.
+    Import a Milli export bundle.
     - Validates bundle format
     - Orchestrations / Agents / Custom Tools: upserted by id/name
     - MCP Servers: skipped if name already exists
@@ -160,8 +160,8 @@ async def import_bundle(req: ImportRequest):
     bundle = req.bundle
 
     # --- Validate bundle ---
-    if not bundle.get("synapse_export"):
-        raise HTTPException(status_code=400, detail="Not a valid Synapse export bundle.")
+    if not bundle.get("milli_export"):
+        raise HTTPException(status_code=400, detail="Not a valid Milli export bundle.")
 
     results: Dict[str, List[Dict[str, str]]] = {
         "orchestrations": [],

@@ -1,5 +1,5 @@
-"""
-Authentication routes: Google OAuth + Synapse login gate.
+﻿"""
+Authentication routes: Google OAuth + Milli login gate.
 """
 import os
 from fastapi import APIRouter, HTTPException
@@ -12,12 +12,12 @@ from core.user_auth import verify_password, create_session_token
 router = APIRouter()
 
 # Read ports from env so they always match the running servers.
-_BACKEND_PORT = int(os.getenv("SYNAPSE_BACKEND_PORT", "8765"))
-_FRONTEND_PORT = int(os.getenv("SYNAPSE_FRONTEND_PORT", "3000"))
+_BACKEND_PORT = int(os.getenv("MILLI_BACKEND_PORT", "8765"))
+_FRONTEND_PORT = int(os.getenv("MILLI_FRONTEND_PORT", "3000"))
 
 # This must match exactly what's registered in your Google Cloud Console
 # OAuth 2.0 Client → Authorized redirect URIs.
-# Add "http://localhost:<SYNAPSE_BACKEND_PORT>/auth/callback" to your OAuth app.
+# Add "http://localhost:<MILLI_BACKEND_PORT>/auth/callback" to your OAuth app.
 REDIRECT_URI = f"http://localhost:{_BACKEND_PORT}/auth/callback"
 _FRONTEND_BASE = f"http://localhost:{_FRONTEND_PORT}"
 

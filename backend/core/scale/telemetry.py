@@ -1,4 +1,4 @@
-"""
+﻿"""
 OpenTelemetry setup for the scale layer.
 No-op when OTLP_ENDPOINT is not configured (standalone / scale mode without observability).
 
@@ -9,7 +9,7 @@ Instruments:
 
 Usage:
     from core.scale.telemetry import setup_telemetry, get_tracer
-    setup_telemetry("synapse-api", otlp_endpoint="http://jaeger:4317")
+    setup_telemetry("milli-api", otlp_endpoint="http://jaeger:4317")
     tracer = get_tracer()
     with tracer.start_as_current_span("my.operation") as span:
         span.set_attribute("run_id", run_id)
@@ -81,7 +81,7 @@ def get_tracer():
         return _tracer
     try:
         from opentelemetry import trace
-        return trace.get_tracer("synapse.scale")
+        return trace.get_tracer("milli.scale")
     except ImportError:
         return _NoOpTracer()
 

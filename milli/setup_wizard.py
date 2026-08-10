@@ -1,4 +1,4 @@
-"""Lightweight interactive setup wizard for Synapse.
+﻿"""Lightweight interactive setup wizard for Milli.
 
 This writes `settings.json` into the data directory and asks for a
 few common configuration options. It's intentionally small so it
@@ -12,10 +12,10 @@ import urllib.request
 import urllib.error
 
 PACKAGE_DIR = Path(__file__).resolve().parent
-ROOT_DIR = PACKAGE_DIR.parent  # project root (synapse-ai/)
-DEFAULT_DATA_DIR = Path.home() / ".synapse" / "data"
+ROOT_DIR = PACKAGE_DIR.parent  # project root (milli-ai/)
+DEFAULT_DATA_DIR = Path.home() / ".milli" / "data"
 
-_raw_data_dir = os.getenv("SYNAPSE_DATA_DIR", str(DEFAULT_DATA_DIR))
+_raw_data_dir = os.getenv("MILLI_DATA_DIR", str(DEFAULT_DATA_DIR))
 if not os.path.isabs(_raw_data_dir):
     DATA_DIR = (ROOT_DIR / _raw_data_dir).resolve()
 else:
@@ -24,7 +24,7 @@ else:
 SETTINGS_FILE = DATA_DIR / "settings.json"
 
 DEFAULT_SETTINGS = {
-    "agent_name": "Synapse",
+    "agent_name": "Milli",
     "model": "",
     "mode": "cloud",
     "openai_key": "",
@@ -161,11 +161,11 @@ def run():
             _stream.reconfigure(encoding="utf-8")
         except Exception:
             pass
-    print("\nSynapse - Interactive Setup")
+    print("\nMilli - Interactive Setup")
     cfg = load_settings()
 
     print("\nGeneral")
-    cfg["agent_name"] = _ask("Agent name", cfg.get("agent_name", "Synapse"))
+    cfg["agent_name"] = _ask("Agent name", cfg.get("agent_name", "Milli"))
 
     print("\nLLM Provider")
     providers = ["Ollama (local)", "Gemini", "OpenAI", "Claude (Anthropic)", "OpenAI Compatible", "Local V1 Compatible", "Bedrock (AWS)", "Skip for now"]
@@ -281,7 +281,7 @@ def run():
 
     save_settings(cfg)
     print(f"\nSettings saved to {SETTINGS_FILE}")
-    print("You can reconfigure anytime with: synapse setup")
+    print("You can reconfigure anytime with: milli setup")
 
 
 if __name__ == "__main__":

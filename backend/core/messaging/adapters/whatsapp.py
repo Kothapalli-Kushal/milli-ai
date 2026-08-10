@@ -1,4 +1,4 @@
-"""
+﻿"""
 WhatsApp adapter with two paths:
 
 Path A — Meta Cloud API (official, requires Business account):
@@ -35,7 +35,7 @@ class WhatsAppAdapter(MessagingAdapter):
         # Meta API credentials
         self.phone_number_id: str = creds.get("phone_number_id", "")
         self.access_token: str = creds.get("access_token", "")
-        self.verify_token: str = creds.get("verify_token", "synapse_verify")
+        self.verify_token: str = creds.get("verify_token", "milli_verify")
 
         # Unofficial mode
         self._playwright_task: asyncio.Task | None = None

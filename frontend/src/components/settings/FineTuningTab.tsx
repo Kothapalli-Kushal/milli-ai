@@ -38,6 +38,18 @@ interface HumanField {
     options?: string[];
 }
 
+interface ProposedFieldEdit {
+    field: string;
+    old_value?: unknown;
+    new_value?: unknown;
+    rationale?: string;
+}
+
+interface ProposedDiff {
+    field_edits?: ProposedFieldEdit[];
+    rationale?: string;
+}
+
 interface SseEvent {
     type?: string;
     run_id?: string;
@@ -55,6 +67,9 @@ interface SseEvent {
     stop?: boolean;
     stop_reason?: string;
     error?: string;
+    error_detail?: string;
+    proposed_diff?: ProposedDiff;
+    improve_run_id?: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -127,6 +142,9 @@ export function FineTuningTab() {
     const [humanPrompt, setHumanPrompt] = useState<string | null>(null);
     const [humanFields, setHumanFields] = useState<HumanField[] | null>(null);
     const [humanValues, setHumanValues] = useState<Record<string, string>>({});
+    const [reviewDiff, setReviewDiff] = useState<ProposedDiff | null>(null);
+    const [reviewRunId, setReviewRunId] = useState<string | null>(null);
+    const [acceptedEditFields, setAcceptedEditFields] = useState<string[]>([]);
 
     const [refreshKey, setRefreshKey] = useState(0);
 
@@ -218,6 +236,20 @@ export function FineTuningTab() {
         setHumanPrompt(null);
         setHumanFields(null);
         setHumanValues({});
+        setReviewDiff(null);
+        setReviewRunId(null);
+        setAcceptedEditFields([]);
+    };
+
+    const formatValue = (value: unknown) => {
+        if (value === undefined) return 'undefined';
+        if (value === null) return 'null';
+        if (typeof value === 'string') return value;
+        try {
+            return JSON.stringify(value, null, 2);
+        } catch {
+            return String(value);
+        }
     };
 
     const handleSSEEvent = useCallback((data: SseEvent) => {
@@ -235,6 +267,14 @@ export function FineTuningTab() {
                 setHumanPrompt(data.prompt || 'Approval required');
                 const fields = Array.isArray(data.fields) ? data.fields : [];
                 setHumanFields(fields);
+                setReviewDiff(data.proposed_diff || null);
+                setReviewRunId(data.improve_run_id || null);
+                const proposedFields = Array.isArray(data.proposed_diff?.field_edits)
+                    ? data.proposed_diff.field_edits
+                        .map((edit) => String(edit.field || '').trim())
+                        .filter((field) => field.length > 0)
+                    : [];
+                setAcceptedEditFields(Array.from(new Set(proposedFields)));
                 const initValues: Record<string, string> = {};
                 fields.forEach((f: HumanField) => {
                     if (f.name) initValues[f.name] = '';
@@ -246,6 +286,14 @@ export function FineTuningTab() {
             case 'benchmark_result':
                 pushEvent(`Benchmark ${data.recorded_as || ''}: ${data.benchmark_id} => ${data.score ?? 'N/A'}`);
                 break;
+            case 'step_error': {
+                const where = data.step_name || data.orch_step_id || 'step';
+                const detail = data.error_detail && data.error_detail !== data.error
+                    ? ` [${data.error_detail}]`
+                    : '';
+                pushEvent(`Step failed — ${where}: ${data.error || 'Unknown error'}${detail}`);
+                break;
+            }
             case 'ratchet_decision':
                 setLastRatchetDecision(data.decision || null);
                 pushEvent(`Ratchet: ${data.decision} (delta ${data.delta ?? 'N/A'})`);
@@ -401,12 +449,21 @@ export function FineTuningTab() {
     const submitHumanInput = async () => {
         if (!runId || !humanFields || humanFields.length === 0) return;
 
-        const response: Record<string, string> = {};
+        const response: Record<string, unknown> = {};
         humanFields.forEach((f) => {
             const value = humanValues[f.name] || '';
             if (f.name) response[f.name] = value;
             if (f.label && f.label !== f.name) response[f.label] = value;
         });
+
+        const actionRaw = String(response.action || humanValues.action || '').trim().toLowerCase();
+        if (actionRaw === 'apply' && reviewDiff?.field_edits?.length) {
+            if (acceptedEditFields.length === 0) {
+                setLaunchError('Select at least one suggested change or choose reject.');
+                return;
+            }
+            response.accepted_fields = acceptedEditFields;
+        }
 
         setRunStatus('running');
         pushEvent('Human input submitted, resuming run');
@@ -574,7 +631,74 @@ export function FineTuningTab() {
 
                 {humanPrompt && (
                     <div className="space-y-2 border border-zinc-800 bg-black p-3">
-                        <p className="text-xs text-zinc-200">{humanPrompt}</p>
+                        <p className="text-xs whitespace-pre-wrap text-zinc-200">{humanPrompt}</p>
+                        {reviewRunId && (
+                            <p className="text-[11px] text-zinc-500 font-mono">improve run {reviewRunId}</p>
+                        )}
+                        {reviewDiff && Array.isArray(reviewDiff.field_edits) && reviewDiff.field_edits.length > 0 && (
+                            <div className="space-y-2 border border-zinc-800 bg-zinc-950 p-2">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-[11px] font-semibold text-zinc-300">Suggested changes</p>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setAcceptedEditFields(Array.from(new Set((reviewDiff.field_edits || []).map((e) => String(e.field || '').trim()).filter((field) => field.length > 0))))}
+                                            className="px-2 py-1 text-[10px] font-semibold border border-zinc-700 text-zinc-300 hover:border-zinc-500"
+                                        >
+                                            Select all
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setAcceptedEditFields([])}
+                                            className="px-2 py-1 text-[10px] font-semibold border border-zinc-700 text-zinc-300 hover:border-zinc-500"
+                                        >
+                                            Select none
+                                        </button>
+                                    </div>
+                                </div>
+                                {reviewDiff.field_edits.map((edit, idx) => (
+                                    <div key={`${edit.field}-${idx}`} className="space-y-1 border border-zinc-800 bg-black p-2">
+                                        <label className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+                                            <input
+                                                type="checkbox"
+                                                checked={acceptedEditFields.includes(edit.field)}
+                                                onChange={(e) => {
+                                                    const field = String(edit.field || '').trim();
+                                                    if (!field) return;
+                                                    setAcceptedEditFields((prev) => {
+                                                        if (e.target.checked) {
+                                                            return prev.includes(field) ? prev : [...prev, field];
+                                                        }
+                                                        return prev.filter((f) => f !== field);
+                                                    });
+                                                }}
+                                                className="h-3.5 w-3.5 accent-emerald-500"
+                                            />
+                                            {edit.field}
+                                        </label>
+                                        {edit.rationale && (
+                                            <p className="text-[11px] text-zinc-400 whitespace-pre-wrap">{edit.rationale}</p>
+                                        )}
+                                        <div className="grid gap-2 md:grid-cols-2">
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] uppercase tracking-wide text-zinc-500">Current value</p>
+                                                <pre className="max-h-40 overflow-auto border border-zinc-800 bg-zinc-950 p-2 text-[11px] text-zinc-300 whitespace-pre-wrap break-words">{formatValue(edit.old_value)}</pre>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <p className="text-[10px] uppercase tracking-wide text-zinc-500">Proposed value</p>
+                                                <pre className="max-h-40 overflow-auto border border-zinc-800 bg-zinc-950 p-2 text-[11px] text-emerald-300 whitespace-pre-wrap break-words">{formatValue(edit.new_value)}</pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {reviewDiff.rationale && (
+                                    <div className="space-y-1 border border-zinc-800 bg-black p-2">
+                                        <p className="text-[10px] uppercase tracking-wide text-zinc-500">Overall rationale</p>
+                                        <p className="text-[11px] text-zinc-300 whitespace-pre-wrap">{reviewDiff.rationale}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         {(humanFields || []).map((f) => (
                             <label key={f.name} className="space-y-1 text-xs text-zinc-400 block">
                                 {f.label || f.name}

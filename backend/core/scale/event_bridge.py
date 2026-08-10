@@ -1,4 +1,4 @@
-"""
+﻿"""
 EventBridge — bridges Redis Streams to FastAPI SSE endpoints.
 
 Each API server instance subscribes directly to the Redis Stream for a
@@ -51,7 +51,7 @@ async def stream_run_events(
 ) -> AsyncGenerator[str, None]:
     """
     Async generator that yields raw SSE lines for a given run_id.
-    Reads from Redis Stream `synapse:run:{run_id}:events`.
+    Reads from Redis Stream `milli:run:{run_id}:events`.
 
     `last_event_id` is the Redis Stream message ID to resume from.
     Pass "0" to replay from the beginning, or the client's Last-Event-ID
@@ -68,7 +68,7 @@ async def stream_run_events(
       "id: 1234-0\ndata: {...}\n\n"
       ": keepalive\n\n"
     """
-    key = f"synapse:run:{run_id}:events"
+    key = f"milli:run:{run_id}:events"
     current_id = last_event_id or "0"
 
     while True:
@@ -131,9 +131,9 @@ async def stream_chat_events(
 ) -> AsyncGenerator[str, None]:
     """
     Same as stream_run_events but for chat session streams.
-    Reads from Redis Stream `synapse:chat:{session_id}:events`.
+    Reads from Redis Stream `milli:chat:{session_id}:events`.
     """
-    key = f"synapse:chat:{session_id}:events"
+    key = f"milli:chat:{session_id}:events"
     current_id = last_event_id or "0"
 
     while True:
@@ -190,7 +190,7 @@ async def get_run_events(
     end: str = "+",
 ) -> list[dict]:
     """Return all stored events for a run as a list of {id, event} dicts."""
-    key = f"synapse:run:{run_id}:events"
+    key = f"milli:run:{run_id}:events"
     try:
         messages = await redis_client.xrange(key, start, end)
     except Exception:
@@ -213,7 +213,7 @@ async def get_chat_events(
     end: str = "+",
 ) -> list[dict]:
     """Return all stored events for a chat session as a list of {id, event} dicts."""
-    key = f"synapse:chat:{session_id}:events"
+    key = f"milli:chat:{session_id}:events"
     try:
         messages = await redis_client.xrange(key, start, end)
     except Exception:

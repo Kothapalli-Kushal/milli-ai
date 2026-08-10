@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tool definitions, aggregation, and system prompt construction.
 Extracted from server.py to eliminate duplication between chat() and chat_stream().
 """
@@ -119,7 +119,7 @@ async def aggregate_all_tools(agent_sessions, active_agent, custom_tools_list):
         else:
             try:
                 # Bounded list_tools() — timeout (default 15s, override via
-                # SYNAPSE_MCP_LIST_TOOLS_TIMEOUT) prevents a single flaky
+                # MILLI_MCP_LIST_TOOLS_TIMEOUT) prevents a single flaky
                 # session from blocking all subsequent tool aggregation.
                 print(f"DEBUG: 🔄 Fetching tools for '{session_name}'...", flush=True)
                 with anyio.fail_after(MCP_LIST_TOOLS_TIMEOUT):
