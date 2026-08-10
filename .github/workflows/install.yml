@@ -1,4 +1,4 @@
-name: Install matrix
+﻿name: Install matrix
 
 # Validates every packaging / installation path so a release can't ship a broken
 # install: PyPI (wheel + sdist across Python versions), npm (bin + files + no
@@ -31,7 +31,7 @@ jobs:
 
       - name: Build wheel + sdist (stub the frontend bundle)
         run: |
-          mkdir -p synapse/_frontend && touch synapse/_frontend/.keep
+          mkdir -p milli/_frontend && touch milli/_frontend/.keep
           pip install hatch
           hatch build
 
@@ -43,15 +43,15 @@ jobs:
           python -m venv /tmp/whl
           /tmp/whl/bin/pip install --upgrade pip
           /tmp/whl/bin/pip install --no-deps dist/*.whl
-          /tmp/whl/bin/synapse --help
-          /tmp/whl/bin/python -c "import synapse.cli; assert callable(synapse.cli.main)"
+          /tmp/whl/bin/milli --help
+          /tmp/whl/bin/python -c "import milli.cli; assert callable(milli.cli.main)"
 
       - name: Install the SDIST in a clean venv and run the CLI
         run: |
           python -m venv /tmp/sdist
           /tmp/sdist/bin/pip install --upgrade pip
           /tmp/sdist/bin/pip install --no-deps dist/*.tar.gz
-          /tmp/sdist/bin/synapse --help
+          /tmp/sdist/bin/milli --help
 
   # ── npm ─────────────────────────────────────────────────────────────────────
   npm-install:
@@ -63,7 +63,7 @@ jobs:
           node-version: '20'
 
       - name: Syntax-check the launcher
-        run: node --check bin/synapse.js
+        run: node --check bin/milli.js
 
       - name: Pack the npm package (stub the frontend bundle)
         run: |
@@ -72,20 +72,20 @@ jobs:
 
       - name: Assert tarball hygiene + required files
         run: |
-          tgz=$(ls synapse-orch-ai-*.tgz)
+          tgz=$(ls milli-orch-ai-*.tgz)
           echo "Packed: $tgz"
           if tar tzf "$tgz" | grep -E '__pycache__|\.pyc$'; then
             echo "::error::npm tarball ships Python bytecode"; exit 1
           fi
-          for f in package/bin/synapse.js package/backend/main.py \
+          for f in package/bin/milli.js package/backend/main.py \
                    package/backend/core/server.py package/scripts/postinstall.js; do
             tar tzf "$tgz" | grep -qx "$f" || { echo "::error::missing $f in npm tarball"; exit 1; }
           done
 
-      - name: Global install links the `synapse` binary
+      - name: Global install links the `milli` binary
         run: |
-          npm install -g ./synapse-orch-ai-*.tgz
-          command -v synapse
+          npm install -g ./milli-orch-ai-*.tgz
+          command -v milli
           # A full run bootstraps a venv + pip install (heavy) — that E2E lives in nightly.
 
   # ── docker-compose ──────────────────────────────────────────────────────────

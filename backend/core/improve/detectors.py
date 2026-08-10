@@ -1,5 +1,5 @@
-"""
-Trace detectors for the Synapse Self-Improvement subsystem (Checkpoint 2).
+﻿"""
+Trace detectors for the Milli Self-Improvement subsystem (Checkpoint 2).
 
 Every detector is a PURE function: a trace dict in (see SCHEMA.md §1),
 a DetectorResult dict out. No I/O, no globals, no clocks, no randomness —
@@ -21,7 +21,7 @@ pure function of its inputs.
 
 Ported RI detectors: loops, give_up, errors, recovery, clean_success,
 duration_outlier, token_usage.
-Synapse-native detectors (grounded in observable react_engine.py behavior):
+Milli-native detectors (grounded in observable react_engine.py behavior):
 sequentialthinking_cap_hit, hallucinated_tool_rate, compaction_thrash,
 sticky_arg_conflict, delegate_pingpong, mcp_ping_timeout_rate,
 browser_state_stale_rate.
@@ -218,7 +218,7 @@ def token_usage(trace):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Synapse-native detectors
+# Milli-native detectors
 # ──────────────────────────────────────────────────────────────────────────────
 
 def sequentialthinking_cap_hit(trace):

@@ -1,5 +1,5 @@
-"""
-User authentication utilities for the Synapse login gate.
+﻿"""
+User authentication utilities for the Milli login gate.
 Provides bcrypt password hashing and HS256 JWT session tokens.
 """
 import os
@@ -13,9 +13,9 @@ _EXP = 86400 * 7  # 7 days
 
 
 def get_jwt_secret() -> str:
-    s = os.getenv("SYNAPSE_JWT_SECRET", "")
+    s = os.getenv("MILLI_JWT_SECRET", "")
     if not s:
-        raise RuntimeError("SYNAPSE_JWT_SECRET is not configured")
+        raise RuntimeError("MILLI_JWT_SECRET is not configured")
     return s
 
 
@@ -35,14 +35,14 @@ def create_session_token(username: str) -> str:
         "sub": username,
         "iat": now,
         "exp": now + _EXP,
-        "iss": "synapse",
+        "iss": "milli",
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=_ALG)
 
 
 def verify_session_token(token: str) -> Optional[str]:
     try:
-        payload = jwt.decode(token, get_jwt_secret(), algorithms=[_ALG], options={"verify_iss": True}, issuer="synapse")
+        payload = jwt.decode(token, get_jwt_secret(), algorithms=[_ALG], options={"verify_iss": True}, issuer="milli")
         return payload.get("sub")
     except Exception:
         return None

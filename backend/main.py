@@ -1,8 +1,8 @@
-import os
+﻿import os
 import sys
 from pathlib import Path
 
-# Load the project-root .env before anything else so that SYNAPSE_BACKEND_PORT
+# Load the project-root .env before anything else so that MILLI_BACKEND_PORT
 # and other vars are available even when running `python main.py` directly.
 _ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
 try:
@@ -12,7 +12,7 @@ except ImportError:
     pass  # dotenv not installed — env vars must be set manually
 
 # Default Copilot CLI to ACP transport; explicit env/.env value still wins.
-os.environ.setdefault("SYNAPSE_COPILOT_MODE", "acp")
+os.environ.setdefault("MILLI_COPILOT_MODE", "acp")
 
 import uvicorn
 
@@ -24,6 +24,6 @@ sys.path.append(current_dir)
 from core.server import app
 
 if __name__ == "__main__":
-    port = int(os.getenv("SYNAPSE_BACKEND_PORT", "8765"))
+    port = int(os.getenv("MILLI_BACKEND_PORT", "8765"))
     print(f"Starting Backend Agent Server from {current_dir} on port {port}...")
     uvicorn.run("core.server:app", host="0.0.0.0", port=port)

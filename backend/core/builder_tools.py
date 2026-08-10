@@ -1,5 +1,5 @@
-"""
-Builder tools for the Synapse AI Builder agent.
+﻿"""
+Builder tools for the Milli AI Builder agent.
 
 Provides CRUD operations on agents and orchestrations that the builder
 meta-agent can call to design and create multi-agent workflows.

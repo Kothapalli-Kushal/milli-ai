@@ -1,4 +1,4 @@
-"""
+﻿"""
 LLM provider API callers (OpenAI, Anthropic, Gemini, Bedrock, Ollama, Grok, DeepSeek, CLI).
 Extracted from server.py to eliminate duplication between chat() and chat_stream().
 
@@ -17,6 +17,7 @@ import tempfile
 import asyncio
 import base64
 import threading
+from typing import Any
 import httpx
 import boto3
 import botocore.exceptions
@@ -133,6 +134,73 @@ def _ollama_base_url() -> str:
     return os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 
 OLLAMA_MODEL = "llama3"
+_OLLAMA_CTX_CACHE: dict[str, int] = {}
+
+
+def _coerce_positive_int(value: Any) -> int | None:
+    try:
+        iv = int(value)
+        return iv if iv > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_ctx_from_model_info(model_info: dict[str, Any] | None) -> int | None:
+    if not isinstance(model_info, dict):
+        return None
+    direct = _coerce_positive_int(model_info.get("context_length"))
+    if direct:
+        return direct
+    for k, v in model_info.items():
+        if isinstance(k, str) and k.endswith(".context_length"):
+            parsed = _coerce_positive_int(v)
+            if parsed:
+                return parsed
+    return None
+
+
+async def _resolve_ollama_max_ctx(client: httpx.AsyncClient, model_name: str) -> int | None:
+    """Resolve the model's max context from Ollama metadata.
+
+    Uses /api/tags first, then /api/show fallback, and caches per model.
+    """
+    cached = _OLLAMA_CTX_CACHE.get(model_name)
+    if cached:
+        return cached
+
+    try:
+        tags_resp = await client.get(f"{_ollama_base_url()}/api/tags", timeout=15.0)
+        tags_resp.raise_for_status()
+        tags_data = tags_resp.json() if tags_resp.content else {}
+        for item in tags_data.get("models", []) or []:
+            if not isinstance(item, dict):
+                continue
+            if item.get("name") == model_name or item.get("model") == model_name:
+                details = item.get("details") or {}
+                tag_ctx = _coerce_positive_int(details.get("context_length"))
+                if tag_ctx:
+                    _OLLAMA_CTX_CACHE[model_name] = tag_ctx
+                    return tag_ctx
+                break
+    except Exception:
+        pass
+
+    try:
+        show_resp = await client.post(
+            f"{_ollama_base_url()}/api/show",
+            json={"name": model_name},
+            timeout=15.0,
+        )
+        show_resp.raise_for_status()
+        show_data = show_resp.json() if show_resp.content else {}
+        show_ctx = _extract_ctx_from_model_info(show_data.get("model_info"))
+        if show_ctx:
+            _OLLAMA_CTX_CACHE[model_name] = show_ctx
+            return show_ctx
+    except Exception:
+        pass
+
+    return None
 
 
 def detect_mode_from_model(model_name: str) -> str:
@@ -404,10 +472,10 @@ async def call_cli_provider(
     # ── ACP fast-path for Copilot ──
     # `copilot -p <prompt>` inlines the whole prompt as an argv argument, which
     # hits Windows' cmd.exe 8,191-char command-line limit almost immediately
-    # once tool schemas + history are baked in. Setting SYNAPSE_COPILOT_MODE=acp
+    # once tool schemas + history are baked in. Setting MILLI_COPILOT_MODE=acp
     # routes through `copilot --acp` over stdio (newline-delimited JSON-RPC)
     # instead, which has no length ceiling. See core/copilot_acp.py.
-    if base_cli == "cli.copilot" and os.getenv("SYNAPSE_COPILOT_MODE", "").lower() == "acp":
+    if base_cli == "cli.copilot" and os.getenv("MILLI_COPILOT_MODE", "").lower() == "acp":
         try:
             from core.copilot_acp import call_copilot_acp, ACPError
             return await call_copilot_acp(full_prompt=full_prompt)
@@ -1793,7 +1861,7 @@ def _load_hf_model(model_id: str, hf_token: str | None = None):
         except ImportError as e:
             raise LLMError(
                 "HuggingFace provider: 'torch' and 'transformers' are not installed. "
-                "Install them on the Synapse host (e.g. `pip install torch transformers`) "
+                "Install them on the Milli host (e.g. `pip install torch transformers`) "
                 "to use hf.* models."
             ) from e
 
@@ -2221,6 +2289,15 @@ async def generate_response(
         _ollama_model = current_model[len("ollama."):] if current_model.startswith("ollama.") else current_model
         async with httpx.AsyncClient() as client:
             try:
+                # Always use the model's maximum context size when available.
+                _num_ctx = await _resolve_ollama_max_ctx(client, _ollama_model)
+                if not _num_ctx:
+                    # Fallback for environments where metadata endpoints are unavailable.
+                    _num_ctx = _coerce_positive_int(current_settings.get("ollama_num_ctx", 0))
+                if not _num_ctx:
+                    _num_ctx = _coerce_positive_int(os.getenv("MILLI_OLLAMA_NUM_CTX", "0"))
+                _ollama_options = {"num_ctx": _num_ctx} if _num_ctx else None
+
                 # Try specific Ollama Tool Call format if tools are provided
                 if tools:
                     print(f"DEBUG: Calling Ollama /api/chat with tools...", flush=True)
@@ -2246,9 +2323,10 @@ async def generate_response(
                             "model": _ollama_model,
                             "messages": messages,
                             "tools": tools,
+                            "options": _ollama_options,
                             "stream": False
                         },
-                        timeout=180.0
+                        timeout=18000.0
                     )
                     response.raise_for_status()
                     data = response.json()
@@ -2294,9 +2372,10 @@ async def generate_response(
                             "model": _ollama_model,
                             "prompt": prompt_for_generate,
                             "system": augmented_system,
+                            "options": _ollama_options,
                             "stream": False
                         },
-                        timeout=180.0
+                        timeout=18000.0
                     )
                     response.raise_for_status()
                     data = response.json()
@@ -2526,7 +2605,7 @@ async def _embed_ollama(texts: list[str], model: str) -> list[list[float]]:
     model = model[len("ollama."):] if model.startswith("ollama.") else model
     url = f"{_ollama_base_url()}/api/embed"
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=200.0) as client:
             resp = await client.post(url, json={"model": model, "input": texts})
             if resp.status_code != 200:
                 # Fallback for older Ollama versions

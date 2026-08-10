@@ -1,4 +1,4 @@
-# General
+﻿# General
 .DS_Store
 .vscode/
 .idea/
@@ -14,6 +14,12 @@ backend/venv/
 backend/data/chroma_db/
 backend/data/*
 backend/.playwright-mcp/
+
+# SQL schema memory — SQLite store + WAL sidecars (any DATA_DIR location)
+sql_memory.sqlite3
+sql_memory.sqlite3-wal
+sql_memory.sqlite3-shm
+sql_memory.freeze
 
 # Javascript / Frontend
 frontend/node_modules/
@@ -40,7 +46,7 @@ dist/
 *.whl
 *.tar.gz
 *.tgz
-synapse/_frontend/
+milli/_frontend/
 frontend-build/
 node_modules/
 

@@ -33,6 +33,39 @@ def _datetime_context() -> str:
     )
 
 
+def _merge_table_schema_context(schema_context: str, tool_output: str) -> str:
+    """Append newly inspected table schemas to an existing schema card."""
+    declared_tables = {
+        name.lower()
+        for name in re.findall(
+            r"(?im)^\s*-\s+((?:\[?[a-z_]\w*\]?\.)?\[?[a-z_]\w*\]?)\s*:",
+            schema_context,
+        )
+    }
+    declared_tables.update(
+        name.strip().lower()
+        for name in re.findall(r"(?im)^\*\*Table:\s*([^*\r\n]+)\*\*", schema_context)
+    )
+
+    new_blocks = []
+    for match in re.finditer(
+        r"(?ims)^\*\*Table:\s*([^*\r\n]+)\*\*\s*\r?\n"
+        r"Columns:\s*\r?\n(?=-)(.*?)(?=^\*\*Table:|\Z)",
+        tool_output,
+    ):
+        table_name = match.group(1).strip().lower()
+        if table_name not in declared_tables:
+            new_blocks.append(match.group(0).strip())
+            declared_tables.add(table_name)
+
+    if not new_blocks:
+        return schema_context
+
+    heading = "ADDITIONAL VERIFIED SCHEMA (from later get_table_schema calls):"
+    separator = f"\n\n{heading}\n" if heading not in schema_context else "\n\n"
+    return schema_context.rstrip() + separator + "\n\n".join(new_blocks)
+
+
 class AgentStepExecutor:
     """Run a sub-agent's ReAct loop. Reuses the existing engine.
 
@@ -90,6 +123,20 @@ class AgentStepExecutor:
         final_response = None
         _log_status = "completed"
         execution_events: list[dict] = []
+
+        async def update_schema_context(tool_name: str, raw_output: str):
+            if tool_name == "get_table_schema" and step.output_key != "schema_context":
+                current = str(run.shared_state.get("schema_context", ""))
+                if current:
+                    merged = _merge_table_schema_context(current, raw_output)
+                    if merged != current:
+                        run.shared_state["schema_context"] = merged
+                        yield {
+                            "type": "schema_context_updated",
+                            "orch_step_id": step.id,
+                            "message": "Added newly inspected table schema to schema_context",
+                        }
+
         try:
             async for event in run_agent_step(
                 message=prompt,
@@ -103,6 +150,7 @@ class AgentStepExecutor:
                 system_prompt_extra=system_prompt_extra,
                 system_prompt_prefix=system_prompt_prefix,
                 model_override=step.model,
+                post_tool_hook=update_schema_context,
             ):
                 execution_events.append(event)
                 agent_log.log_event(event)
@@ -345,15 +393,6 @@ class ToolStepExecutor:
             try:
                 tool_sys_prompt = "You are a tool-calling assistant. Output ONLY valid JSON."
                 tool_sys_prompt = _inject_db_context(active_agent, tool_sys_prompt)
-                print(
-                    f"DEBUG TOOL STEP: step={step.id} agent_id={step.agent_id!r} "
-                    f"active_agent_keys={list(active_agent.keys())} "
-                    f"active_agent_type={active_agent.get('type')!r} "
-                    f"active_agent_db_configs={active_agent.get('db_configs')} "
-                    f"sys_prompt_has_LINKED_DATABASES={'### LINKED DATABASES ###' in tool_sys_prompt} "
-                    f"sys_prompt_len={len(tool_sys_prompt)}",
-                    flush=True,
-                )
                 if system_prompt_prefix:
                     tool_sys_prompt = system_prompt_prefix + "\n\n" + tool_sys_prompt
                 response = await llm_generate(

@@ -289,14 +289,21 @@ function DeterministicExpectedEditor({ expected, onChange }: {
     onChange: (e: ExpectedSpec) => void;
 }) {
     const checks = expected.checks ?? [];
+    const usesSqlChecks = checks.some(c => c.compare?.type === 'sql_equivalent' || c.compare?.type === 'sql_execution');
     return (
         <div className="space-y-1.5">
-            <input
-                value={expected.reference_sql ?? ''}
-                onChange={e => onChange({ ...expected, reference_sql: e.target.value || undefined })}
-                placeholder="reference SQL (validated by double execution at save time)"
-                className={`w-full font-mono ${FIELD}`}
-            />
+            <div className="text-[9px] text-zinc-500">
+                Deterministic grading works for any process you can verify from trace data or final outputs. SQL fields only apply when a check uses a SQL comparator.
+            </div>
+            {(usesSqlChecks || expected.reference_sql) && (
+                <input
+                    value={expected.reference_sql ?? ''}
+                    onChange={e => onChange({ ...expected, reference_sql: e.target.value || undefined })}
+                    placeholder="reference query for SQL comparators"
+                    className={`w-full font-mono ${FIELD}`}
+                    title="Optional helper for sql_equivalent and sql_execution checks"
+                />
+            )}
             {checks.map((c, i) => (
                 <CheckRow key={i} check={c}
                     onChange={next => onChange({ ...expected, checks: checks.map((x, j) => (j === i ? next : x)) })}
@@ -705,8 +712,12 @@ export function BenchmarkEditor({ targetId, onRan }: BenchmarkEditorProps) {
                             </select>
                         )}
                         {draft.grading_mode === 'deterministic' && (
-                            <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-[8px] uppercase text-zinc-600 font-bold">execution env</span>
+                            <div className="space-y-1.5">
+                                <div className="text-[9px] text-zinc-500">
+                                    Deterministic checks can grade plain outputs, tool arguments, or tool results. Execution context is optional and only used by execution-based comparators such as sql_execution.
+                                </div>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    <span className="text-[8px] uppercase text-zinc-600 font-bold">execution context</span>
                                 <input
                                     value={draft.execution_env?.connection_id ?? ''}
                                     onChange={e => setDraft({
@@ -715,7 +726,7 @@ export function BenchmarkEditor({ targetId, onRan }: BenchmarkEditorProps) {
                                             ? { timeout_s: 10, max_rows: 5000, ...draft.execution_env, connection_id: e.target.value }
                                             : null,
                                     })}
-                                    placeholder="SQL connection id (existing)"
+                                    placeholder="existing connection id (optional)"
                                     className={`w-40 font-mono ${FIELD}`}
                                 />
                                 <input
@@ -727,11 +738,12 @@ export function BenchmarkEditor({ targetId, onRan }: BenchmarkEditorProps) {
                                     placeholder="snapshot id"
                                     disabled={!draft.execution_env}
                                     className={`w-32 font-mono ${FIELD} disabled:opacity-40`}
-                                    title="Unpinned snapshots downgrade outcome scores from exact reproducibility"
+                                    title="Unpinned snapshots downgrade execution-based outcome scores from exact reproducibility"
                                 />
                                 {draft.execution_env && !draft.execution_env.snapshot_id && (
-                                    <span className="text-[9px] text-amber-400">unpinned — scores will not be exactly reproducible</span>
+                                    <span className="text-[9px] text-amber-400">unpinned execution context — scores will not be exactly reproducible</span>
                                 )}
+                                </div>
                             </div>
                         )}
                         {isV2 && (

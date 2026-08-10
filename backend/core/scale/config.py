@@ -1,4 +1,4 @@
-"""
+﻿"""
 Scale mode configuration — reads from settings and environment variables.
 Returns ScaleConfig(scale_mode=False) when Redis URL is not set (standalone mode).
 """
@@ -41,7 +41,7 @@ class ScaleConfig:
     # S3 storage (vault + logs in scale mode)
     s3_bucket: str = ""
     s3_region: str = "us-east-1"
-    s3_prefix: str = "synapse"
+    s3_prefix: str = "milli"
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
     s3_endpoint_url: str = ""      # for MinIO, Cloudflare R2, etc.
@@ -97,7 +97,7 @@ def get_scale_config() -> ScaleConfig:
         k8s_mode=bool(int(os.getenv("K8S_MODE", "0"))),
         s3_bucket=os.getenv("S3_BUCKET", settings.get("s3_bucket", "")),
         s3_region=os.getenv("S3_REGION", settings.get("s3_region", "us-east-1")),
-        s3_prefix=os.getenv("S3_PREFIX", settings.get("s3_prefix", "synapse")),
+        s3_prefix=os.getenv("S3_PREFIX", settings.get("s3_prefix", "milli")),
         s3_access_key_id=os.getenv("S3_ACCESS_KEY_ID", settings.get("s3_access_key_id", "")),
         s3_secret_access_key=os.getenv("S3_SECRET_ACCESS_KEY", settings.get("s3_secret_access_key", "")),
         s3_endpoint_url=os.getenv("S3_ENDPOINT_URL", settings.get("s3_endpoint_url", "")),

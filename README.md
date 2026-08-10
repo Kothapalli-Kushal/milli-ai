@@ -1,23 +1,23 @@
-# Synapse AI — Multi-Agent Orchestration Platform
+﻿# Milli AI — Multi-Agent Orchestration Platform
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/c673ea6f-4979-4b38-93ae-c594ac3d641c" alt="synapse-ai-github" width="600" />
+  <img src="https://github.com/user-attachments/assets/c673ea6f-4979-4b38-93ae-c594ac3d641c" alt="milli-ai-github" width="600" />
 </p>
 
 <p align="center">
   <a href="https://synapseorch.com"><img src="https://img.shields.io/badge/Website-synapseorch.com-0A0A0A?logo=vercel&logoColor=white" alt="Website"></a>
   <a href="https://docs.synapseorch.com"><img src="https://img.shields.io/badge/Docs-docs.synapseorch.com-blue?logo=readthedocs&logoColor=white" alt="Docs"></a>
   <a href="https://discord.gg/9UN45qyGh8"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://github.com/synapseorch-ai/synapse-ai"><img src="https://img.shields.io/github/stars/synapseorch-ai/synapse-ai?style=social" alt="GitHub stars"></a>
-  <a href="https://github.com/synapseorch-ai/synapse-ai?tab=AGPL-3.0-1-ov-file"><img src="https://img.shields.io/github/license/synapseorch-ai/synapse-ai" alt="License"></a>
-  <a href="https://www.npmjs.com/package/synapse-orch-ai"><img src="https://img.shields.io/npm/v/synapse-orch-ai?logo=npm&label=npm" alt="npm"></a>
-  <a href="https://pypi.org/project/synapse-orch-ai/"><img src="https://img.shields.io/pypi/v/synapse--orch-ai?logo=pypi&logoColor=white&label=pypi" alt="PyPI"></a>
-  <a href="https://hub.docker.com/r/synapseorchai/synapse-ai"><img src="https://img.shields.io/docker/pulls/synapseorchai/synapse-ai?logo=docker&logoColor=white&label=docker" alt="Docker Pulls"></a>
+  <a href="https://github.com/synapseorch-ai/milli-ai"><img src="https://img.shields.io/github/stars/synapseorch-ai/milli-ai?style=social" alt="GitHub stars"></a>
+  <a href="https://github.com/synapseorch-ai/milli-ai?tab=AGPL-3.0-1-ov-file"><img src="https://img.shields.io/github/license/synapseorch-ai/milli-ai" alt="License"></a>
+  <a href="https://www.npmjs.com/package/milli-orch-ai"><img src="https://img.shields.io/npm/v/milli-orch-ai?logo=npm&label=npm" alt="npm"></a>
+  <a href="https://pypi.org/project/milli-orch-ai/"><img src="https://img.shields.io/pypi/v/milli--orch-ai?logo=pypi&logoColor=white&label=pypi" alt="PyPI"></a>
+  <a href="https://hub.docker.com/r/synapseorchai/milli-ai"><img src="https://img.shields.io/docker/pulls/synapseorchai/milli-ai?logo=docker&logoColor=white&label=docker" alt="Docker Pulls"></a>
 </p>
 
 *Build AI workflows that actually ship.*
 
-**Wire agents, tools, and LLMs into deterministic pipelines — without the framework lock-in.** Synapse is an open-source platform for creating, connecting, and orchestrating AI agents powered by any LLM — local or cloud. Agents use real tools: browsing the web, querying databases, executing code, reading files, managing emails, and anything else you can expose through an MCP server, a webhook, or a Python script.
+**Wire agents, tools, and LLMs into deterministic pipelines — without the framework lock-in.** Milli is an open-source platform for creating, connecting, and orchestrating AI agents powered by any LLM — local or cloud. Agents use real tools: browsing the web, querying databases, executing code, reading files, managing emails, and anything else you can expose through an MCP server, a webhook, or a Python script.
 
 <p align="center">
   <a href="https://synapseorch.com"><strong>🌐 Website</strong></a> · 
@@ -33,33 +33,33 @@
 
 **macOS / Linux:**
 ```bash
-curl -sSL https://raw.githubusercontent.com/synapseorch-ai/synapse-ai/main/setup.sh | bash
+curl -sSL https://raw.githubusercontent.com/synapseorch-ai/milli-ai/main/setup.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/synapseorch-ai/synapse-ai/main/setup.ps1 | iex
+irm https://raw.githubusercontent.com/synapseorch-ai/milli-ai/main/setup.ps1 | iex
 ```
 
 ### npm
 ```bash
-npm install -g synapse-orch-ai
-synapse
+npm install -g milli-orch-ai
+milli
 ```
 
 ### pip
 ```bash
-pip install synapse-orch-ai
-synapse
+pip install milli-orch-ai
+milli
 ```
 
 ### Docker
 ```bash
 docker run -d \
   -p 3000:3000 \
-  -v synapse-data:/data \
+  -v milli-data:/data \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  synapseorchai/synapse-ai:latest
+  synapseorchai/milli-ai:latest
 ```
 
 Then open `http://localhost:3000`. See the [Docker guide](https://docs.synapseorch.com/getting-started/installation#docker) in the docs for custom ports and environment variable configuration.
@@ -68,10 +68,10 @@ Then open `http://localhost:3000`. See the [Docker guide](https://docs.synapseor
 
 | Install method | Upgrade command |
 |---|---|
-| Bash / PowerShell installer (recommended) | `synapse upgrade` |
-| pip | `pip install --upgrade synapse-orch-ai` |
-| npm | `npm update -g synapse-orch-ai` |
-| Docker | `docker pull synapseorchai/synapse-ai:latest` |
+| Bash / PowerShell installer (recommended) | `milli upgrade` |
+| pip | `pip install --upgrade milli-orch-ai` |
+| npm | `npm update -g milli-orch-ai` |
+| Docker | `docker pull synapseorchai/milli-ai:latest` |
 
 ---
 
@@ -89,9 +89,9 @@ Run unlimited agents and orchestrations concurrently. When you need to go beyond
 Three Docker images — pull only what you need:
 
 ```bash
-docker pull synapseorchai/synapse-ai:latest             # full app (standalone mode)
-docker pull synapseorchai/synapse-ai-api-server:latest  # stateless API server (scale mode)
-docker pull synapseorchai/synapse-ai-worker:latest      # worker process (scale mode, run as many as needed)
+docker pull synapseorchai/milli-ai:latest             # full app (standalone mode)
+docker pull synapseorchai/milli-ai-api-server:latest  # stateless API server (scale mode)
+docker pull synapseorchai/milli-ai-worker:latest      # worker process (scale mode, run as many as needed)
 ```
 
 The `docker-compose.yml` in the repo spins up the full stack. Production K8s manifests are in `infra/k8s/`.
@@ -100,7 +100,7 @@ The `docker-compose.yml` in the repo spins up the full stack. Production K8s man
 
 ---
 
-## What Makes Synapse Different
+## What Makes Milli Different
 
 - **Multi-Model Orchestrations** — Run a different LLM at every step. Use a fast model for routing, a powerful one for analysis. You control where the compute goes.
 - **Deterministic DAG Execution** — Orchestrations follow the exact path you designed. No hallucinated detours.
@@ -115,7 +115,7 @@ The `docker-compose.yml` in the repo spins up the full stack. Production K8s man
 
 ---
 
-## Synapse UI
+## Milli UI
 
 https://github.com/user-attachments/assets/7a5ab42c-5fae-4f13-876c-13aa9b5a0366
 
@@ -149,7 +149,7 @@ https://github.com/user-attachments/assets/282cc99d-cdea-4ad0-b648-f22112c6e295
 | **Schedules** | Cron/interval automation with messaging notifications. [Docs →](https://docs.synapseorch.com/integrations/scheduling) |
 | **Messaging** | Slack, Discord, Telegram, Teams, WhatsApp — with multi-agent mode. [Docs →](https://docs.synapseorch.com/integrations/messaging) |
 | **Scale Mode** | Distributed execution layer: Redis job queue, independent worker fleet, per-step Postgres checkpoints, S3 artifact storage, and multi-tenant quotas. [Docs →](https://docs.synapseorch.com/scale/overview) |
-| **V2 API** | Stable versioned REST API for building products on top of Synapse — enqueue, stream, cancel, webhooks. [Docs →](https://docs.synapseorch.com/api/overview) |
+| **V2 API** | Stable versioned REST API for building products on top of Milli — enqueue, stream, cancel, webhooks. [Docs →](https://docs.synapseorch.com/api/overview) |
 | **Vault** | Persistent file storage shared across agents and sessions. [Docs →](https://docs.synapseorch.com/vault) |
 
 ---
@@ -157,10 +157,10 @@ https://github.com/user-attachments/assets/282cc99d-cdea-4ad0-b648-f22112c6e295
 ## CLI
 
 ```bash
-synapse start     # start backend + frontend, open browser
-synapse stop      # stop background processes
-synapse upgrade   # upgrade to the latest version
-synapse uninstall # remove Synapse, wipe ~/.synapse, and uninstall the package
+milli start     # start backend + frontend, open browser
+milli stop      # stop background processes
+milli upgrade   # upgrade to the latest version
+milli uninstall # remove Milli, wipe ~/.milli, and uninstall the package
 ```
 
 ---
@@ -175,7 +175,7 @@ synapse uninstall # remove Synapse, wipe ~/.synapse, and uninstall the package
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=synapseorch-ai/synapse-ai&type=date&legend=top-left)](https://www.star-history.com/#synapseorch-ai/synapse-ai&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/svg?repos=synapseorch-ai/milli-ai&type=date&legend=top-left)](https://www.star-history.com/#synapseorch-ai/milli-ai&type=date&legend=top-left)
 
 ---
 
@@ -185,4 +185,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, architecture details, how 
 
 ## License
 
-Synapse AI is licensed under AGPL v3 — see [LICENSE](LICENSE)
+Milli AI is licensed under AGPL v3 — see [LICENSE](LICENSE)

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Vault: Automatically saves large tool outputs to files and provides tools to query them.
 Also resolves @[path] vault file mentions in user messages before they reach the LLM.
 
@@ -171,7 +171,7 @@ def _ensure_local_path(path: str) -> str:
             return path
         # Write to a temp file alongside the vault directory
         import tempfile
-        tmp_dir = Path(tempfile.gettempdir()) / "synapse_vault_cache"
+        tmp_dir = Path(tempfile.gettempdir()) / "milli_vault_cache"
         tmp_dir.mkdir(parents=True, exist_ok=True)
         safe = re.sub(r"[/\\]", "_", rel)
         tmp_path = tmp_dir / safe

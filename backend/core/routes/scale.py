@@ -1,4 +1,4 @@
-"""
+﻿"""
 Scale settings management routes (UI-facing, internal auth).
 Provides connection testing, sync, worker management, and DLQ access.
 """
@@ -31,7 +31,7 @@ class ScaleConfigUpdate(BaseModel):
     # S3 storage
     s3_bucket: str = ""
     s3_region: str = "us-east-1"
-    s3_prefix: str = "synapse"
+    s3_prefix: str = "milli"
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
     s3_endpoint_url: str = ""
@@ -55,7 +55,7 @@ async def get_scale_config_route():
         "num_queue_shards": settings.get("num_queue_shards", 1),
         "s3_bucket": settings.get("s3_bucket", ""),
         "s3_region": settings.get("s3_region", "us-east-1"),
-        "s3_prefix": settings.get("s3_prefix", "synapse"),
+        "s3_prefix": settings.get("s3_prefix", "milli"),
         "s3_access_key_id": settings.get("s3_access_key_id", ""),
         "s3_secret_access_key": settings.get("s3_secret_access_key", ""),
         "s3_endpoint_url": settings.get("s3_endpoint_url", ""),
@@ -102,7 +102,7 @@ async def update_scale_config_route(body: ScaleConfigUpdate):
 class S3TestRequest(BaseModel):
     s3_bucket: str
     s3_region: str = "us-east-1"
-    s3_prefix: str = "synapse"
+    s3_prefix: str = "milli"
     s3_access_key_id: str = ""
     s3_secret_access_key: str = ""
     s3_endpoint_url: str = ""
@@ -110,10 +110,10 @@ class S3TestRequest(BaseModel):
 
 @router.post("/scale/test-s3")
 async def test_s3_connection(body: S3TestRequest):
-    from core.s3_storage import SynapseS3
+    from core.s3_storage import MilliS3
     if not body.s3_bucket:
         raise HTTPException(400, detail="s3_bucket is required")
-    client = SynapseS3(
+    client = MilliS3(
         bucket=body.s3_bucket,
         region=body.s3_region,
         prefix=body.s3_prefix,
@@ -298,11 +298,11 @@ async def queue_stats(request: Request):
     try:
         if cfg.num_queue_shards > 1:
             import asyncio
-            shard_names = [f"synapse:orchestrations:{i}" for i in range(cfg.num_queue_shards)]
+            shard_names = [f"milli:orchestrations:{i}" for i in range(cfg.num_queue_shards)]
             counts = await asyncio.gather(*[redis.zcard(q) for q in shard_names], return_exceptions=True)
             queued = sum(c for c in counts if isinstance(c, int))
         else:
-            queue_name = f"synapse:orchestrations:{cfg.default_tenant_id if cfg.enable_tenant_isolation else 'default'}"
+            queue_name = f"milli:orchestrations:{cfg.default_tenant_id if cfg.enable_tenant_isolation else 'default'}"
             queued = await redis.zcard(queue_name) or 0
     except Exception:
         queued = 0
@@ -414,7 +414,7 @@ async def retry_dlq_job(dlq_id: str, request: Request):
 
     # Re-enqueue the original job to the correct worker queue
     import os as _os
-    queue_name = f"synapse:orchestrations:{_os.getenv('WORKER_QUEUE_SHARD', 'default')}"
+    queue_name = f"milli:orchestrations:{_os.getenv('WORKER_QUEUE_SHARD', 'default')}"
     payload = row.job_payload or {}
     await arq_redis.enqueue_job(row.job_function, **payload, _queue_name=queue_name)
 

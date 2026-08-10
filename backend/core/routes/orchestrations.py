@@ -1,4 +1,4 @@
-"""
+﻿"""
 Orchestration management endpoints: CRUD, run, human-input, cancel.
 """
 import asyncio
@@ -145,6 +145,7 @@ async def run_orchestration(orch_id: str, request: Request):
 
     body = await request.json()
     user_input = body.get("message", "")
+    initial_state = body.get("initial_state") or None
     run_id = f"run_{orch_id}_{int(time.time() * 1000)}"
 
     orch = Orchestration.model_validate(orch_data)
@@ -158,7 +159,11 @@ async def run_orchestration(orch_id: str, request: Request):
 
     async def _run_engine():
         try:
-            async for event in engine.run(user_input, run_id):
+            async for event in engine.run(
+                user_input,
+                run_id,
+                initial_state=initial_state,
+            ):
                 etype = event.get("type", "")
                 if etype not in ("chunk", "thinking", "token_usage"):
                     print(f"DEBUG SSE QUEUE: → {etype} step={event.get('orch_step_id', '')}", flush=True)
@@ -309,9 +314,9 @@ async def submit_human_input(run_id: str, request: Request):
                 import os as _os
                 _scale_cfg = _get_scale_cfg()
                 _queue_name = (
-                    f"synapse:orchestrations:{row.tenant_id or _scale_cfg.default_tenant_id}"
+                    f"milli:orchestrations:{row.tenant_id or _scale_cfg.default_tenant_id}"
                     if _scale_cfg.enable_tenant_isolation
-                    else f"synapse:orchestrations:{_os.getenv('WORKER_QUEUE_SHARD', 'default')}"
+                    else f"milli:orchestrations:{_os.getenv('WORKER_QUEUE_SHARD', 'default')}"
                 )
                 resp = human_response if isinstance(human_response, dict) else {"response": human_response}
                 await publish_human_input(redis, run_id, resp)

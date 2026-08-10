@@ -244,6 +244,7 @@ class OrchestrationEngine:
                 #     tool call,
                 #   • max_turns / max_total_turns guards.
                 human_input_event: dict | None = None
+                step_error_message: str | None = None
                 try:
                     async for event in executor.execute(step, run, self):
                         # Feed every event to the logger
@@ -281,6 +282,13 @@ class OrchestrationEngine:
                                 logger.step_end(step.id, "completed")
                             break
 
+                        if event.get("type") == "step_error" and event.get("orch_step_id") == step.id:
+                            # Preserve explicit step-level failures from executors.
+                            step_error_message = event.get("error") or "Step execution failed"
+                            run.status = "failed"
+                            yield event
+                            break
+
                         yield event
                 except (TimeoutError, Exception) as _te:
                     # anyio/MCP may deliver timeouts as ExceptionGroup([TimeoutError])
@@ -308,8 +316,25 @@ class OrchestrationEngine:
                     yield human_input_event
                     return
 
-                # If END step or timeout set status, break out
-                if run.status in ("completed", "failed"):
+                if run.status == "failed":
+                    if not (
+                        run.step_history
+                        and run.step_history[-1].get("step_id") == step.id
+                        and run.step_history[-1].get("status") == "failed"
+                    ):
+                        run.step_history.append({
+                            "step_id": step.id,
+                            "step_name": step.name,
+                            "step_type": step.type.value,
+                            "status": "failed",
+                            "error": step_error_message or "Step execution failed",
+                        })
+                        if logger:
+                            logger.step_end(step.id, "failed", step_error_message or "Step execution failed")
+                    break
+
+                # END step completion path exits without step_complete metadata.
+                if run.status == "completed":
                     break
 
                 # Record step completion
@@ -349,19 +374,24 @@ class OrchestrationEngine:
                 import traceback; print(f"DEBUG ENGINE: ❌ EXCEPTION in step '{step.id}': {e}\n{traceback.format_exc()}", flush=True)
                 if _extract_timeout(e) is not None:
                     safe_error = f"Step '{step.name}' timed out after {step_timeout}s"
+                    error_detail = safe_error
                 else:
                     safe_error = "An internal error occurred while executing this step."
+                    error_detail = f"{type(e).__name__}: {e}"
                 run.step_history.append({
                     "step_id": step.id,
                     "step_name": step.name,
                     "step_type": step.type.value,
                     "status": "failed",
                     "error": safe_error,
+                    "error_detail": error_detail,
                 })
                 run.status = "failed"
                 if logger:
                     logger.step_end(step.id, "failed", safe_error)
-                yield {"type": "step_error", "orch_step_id": step.id, "error": safe_error}
+                    logger.step_failure_detail(step.id, e)
+                yield {"type": "step_error", "orch_step_id": step.id,
+                       "error": safe_error, "error_detail": error_detail}
                 break
 
         # Finalize

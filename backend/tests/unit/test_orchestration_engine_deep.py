@@ -54,6 +54,35 @@ class TestHumanResume:
         finals = [e for e in resumed if e.get("type") == "final"]
         assert any("yes" in str(e.get("response", "")) for e in finals)
 
+    async def test_structured_explanation_reaches_next_model(self, fake_llm):
+        from core.models_orchestration import Orchestration
+        from core.orchestration.engine import OrchestrationEngine
+
+        orch_dict = S.make_orchestration(
+            id="orch_human_explanation",
+            entry_step_id="h",
+            steps=[
+                {"id": "h", "name": "Approve", "type": "human",
+                 "human_prompt": "Approve?", "output_key": "approval",
+                 "next_step_id": "revise"},
+                {"id": "revise", "name": "Revise", "type": "llm",
+                 "prompt_template": "Revise the answer using the human feedback.",
+                 "input_keys": ["approval"], "output_key": "final",
+                 "model": "claude-x", "next_step_id": None},
+            ],
+        )
+        S.seed_orchestrations([orch_dict])
+        server = _server()
+        run_id = "run_human_explanation"
+
+        await _collect(OrchestrationEngine(Orchestration.model_validate(orch_dict), server)
+                       .run("the task", run_id=run_id))
+        response = {"Your decision": "No", "Explanation": "Use the settled-date column."}
+        await _collect(OrchestrationEngine.resume(run_id, response, server))
+
+        assert fake_llm.calls
+        assert "Use the settled-date column." in fake_llm.calls[-1]["prompt_msg"]
+
 
 class TestLoopBody:
     async def test_loop_with_multistep_body(self, fake_llm):

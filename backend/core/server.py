@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import json
 import os
 import platform
@@ -74,7 +74,7 @@ _NPX_CMD = "npx.cmd" if _IS_WIN else "npx"
 TOOLS_DIR = Path(__file__).resolve().parent.parent / "tools"
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 _PROJECT_ROOT = BACKEND_ROOT.parent
-_data_dir_env = os.getenv("SYNAPSE_DATA_DIR", "")
+_data_dir_env = os.getenv("MILLI_DATA_DIR", "")
 if _data_dir_env:
     _data_dir_p = Path(_data_dir_env)
     DATA_DIR = _data_dir_p if _data_dir_p.is_absolute() else _PROJECT_ROOT / _data_dir_p
@@ -558,7 +558,7 @@ async def lifespan(app: FastAPI):
             _tcfg = _get_scale_cfg()
             if _tcfg.otlp_endpoint:
                 from core.scale.telemetry import setup_telemetry
-                setup_telemetry("synapse-api", otlp_endpoint=_tcfg.otlp_endpoint)
+                setup_telemetry("milli-api", otlp_endpoint=_tcfg.otlp_endpoint)
         except Exception as e:
             print(f"Warning: Telemetry setup failed: {e}")
 
@@ -692,8 +692,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-_frontend_port = os.getenv("SYNAPSE_FRONTEND_PORT", "3000")
-_backend_port_cors = os.getenv("SYNAPSE_BACKEND_PORT", "8765")
+_frontend_port = os.getenv("MILLI_FRONTEND_PORT", "3000")
+_backend_port_cors = os.getenv("MILLI_BACKEND_PORT", "8765")
 _cors_defaults = {
     f"http://localhost:{_frontend_port}",
     "http://localhost:3000",
@@ -775,5 +775,5 @@ app.include_router(improve_router)  # self-improvement routes (auth-scoped, see 
 
 if __name__ == "__main__":
     import uvicorn
-    _port = int(os.getenv("SYNAPSE_BACKEND_PORT", "8765"))
+    _port = int(os.getenv("MILLI_BACKEND_PORT", "8765"))
     uvicorn.run(app, host="0.0.0.0", port=_port)

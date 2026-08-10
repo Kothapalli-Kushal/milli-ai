@@ -118,6 +118,22 @@ class OrchestrationLogger:
   Time           : {_ts()}
 """)
 
+    def step_failure_detail(self, step_id: str, exc: BaseException):
+        """Write the real exception type, message, and full traceback to the log.
+
+        The client-facing error is sanitized to a generic string, so this is the
+        only place the actual failure cause is captured for local diagnosis.
+        """
+        import traceback
+        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)).rstrip()
+        cause = f"{type(exc).__name__}: {exc}" or type(exc).__name__
+        self._write(f"""
+  🐞 FAILURE DETAIL: {step_id}
+     Cause          : {cause}
+     Traceback      :
+{self._indent(tb, 7)}
+""")
+
     # ── Event logging ──────────────────────────────────────────────
 
     def log_event(self, event: dict):

@@ -93,6 +93,7 @@ class Settings(BaseModel):
     local_compatible_base_url: str = ""  # Base URL for local v1-compatible (vLLM, LM Studio, etc.)
     local_compatible_key: str = ""  # Optional API key for local v1-compatible
     local_compatible_models: str = ""  # Comma-separated model names for local v1-compatible
+    ollama_num_ctx: int = 0  # Optional local Ollama context override (0 = provider default)
     openai_compatible_embed_models: str = ""  # Comma-separated embedding model names for OpenAI-compatible cloud
     local_compatible_embed_models: str = ""  # Comma-separated embedding model names for local v1-compatible
     huggingface_token: str = ""  # Optional HF access token (required for gated models like Llama, Gemma)

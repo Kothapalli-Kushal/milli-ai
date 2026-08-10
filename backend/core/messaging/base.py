@@ -1,4 +1,4 @@
-"""
+﻿"""
 Abstract base class for all messaging platform adapters.
 Every adapter must implement start(), stop(), and send_message().
 The shared dispatch logic lives here.
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # Built-in commands handled before routing to agent
 _BUILTIN_COMMANDS = {"/start", "/help", "/reset", "/agent", "/agents"}
 
-HELP_TEXT = """? *Synapse AI Bot*
+HELP_TEXT = """? *Milli AI Bot*
 
 Available commands:
 /start -- Show this welcome message

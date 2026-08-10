@@ -4,6 +4,7 @@ Shared state management and JSON checkpointing for orchestration runs.
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 
 from core.models_orchestration import OrchestrationRun
@@ -46,7 +47,19 @@ class SharedState:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 f.write(self.run.model_dump_json(indent=2))
-            os.replace(tmp_path, target)
+            # On Windows os.replace raises PermissionError (sharing violation)
+            # when a reader (e.g. status polling via SharedState.restore) has
+            # the target file open. POSIX renames succeed regardless. Retry a
+            # few times with a short backoff so a transient poll collision does
+            # not crash the step with a masked "internal error".
+            for attempt in range(10):
+                try:
+                    os.replace(tmp_path, target)
+                    break
+                except PermissionError:
+                    if attempt == 9:
+                        raise
+                    time.sleep(0.05)
         except Exception:
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)

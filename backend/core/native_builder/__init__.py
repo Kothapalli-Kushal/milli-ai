@@ -1,5 +1,5 @@
-"""
-Native Builder — Synapse's AI Builder implemented as a real orchestration.
+﻿"""
+Native Builder — Milli's AI Builder implemented as a real orchestration.
 
 This package holds the seed JSON definitions (orchestration + sub-agents) and
 the idempotent seeding function used at startup. See seed.py.

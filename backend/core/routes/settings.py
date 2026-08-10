@@ -1,4 +1,4 @@
-"""
+﻿"""
 Settings, personal details, and config endpoints.
 """
 import os
@@ -26,7 +26,7 @@ class EmbedSetupRequest(BaseModel):
     port: int = 5432
     username: str = "postgres"
     password: str = ""
-    db_name: str = "synapse"
+    db_name: str = "milli"
 
 
 class LoginConfigRequest(BaseModel):

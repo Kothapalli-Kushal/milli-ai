@@ -1,5 +1,5 @@
-"""
-Version snapshots for the Synapse Self-Improvement subsystem (Checkpoint 3).
+﻿"""
+Version snapshots for the Milli Self-Improvement subsystem (Checkpoint 3).
 
 Rollback is JSON, not git (CLAUDE.md §0.3.4). Every apply snapshots the
 target's full config to `versions/<object_id>/v<N>.json` FIRST; the new

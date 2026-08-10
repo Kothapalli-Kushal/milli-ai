@@ -34,6 +34,9 @@ CPU_LIMIT = "1.0"
 DOCKER_IMAGE = "sandbox-python:latest"
 MAX_OUTPUT = 50_000                # chars
 
+# Set SYNAPSE_PYTHON_BACKEND=docker to use Docker instead.
+EXECUTION_BACKEND = os.getenv("SYNAPSE_PYTHON_BACKEND", "uv")
+
 # ── shared helpers ───────────────────────────────────────────────────────
 
 def _ok(data: dict) -> list[TextContent]:
@@ -301,14 +304,11 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="execute_python",
             description=(
-                "Execute Python code in a secure Docker container (512 MB RAM, 1 CPU, "
-                "read-only filesystem, no network by default). "
-                "Pre-installed packages: pandas, pandas_ta, numpy, scipy, scikit-learn, "
-                "matplotlib, seaborn, requests, httpx, beautifulsoup4, lxml, openpyxl, "
-                "xlsxwriter, pyyaml, tabulate, jinja2, jsonschema, pillow, sympy. "
-                "Additional packages can be installed via the 'packages' parameter. "
-                "Vault files are mounted read-only at /data — e.g. vault path "
-                "'reports/q1.json' is available at '/data/reports/q1.json'. "
+                "Execute Python code in an isolated uv environment (no Docker needed). "
+                "Pre-installed packages available via the 'packages' parameter (uv installs "
+                "them into a temporary venv per run). "
+                "Vault files are accessible via the DATA_DIR variable injected into every "
+                "script — e.g. open(DATA_DIR + '/reports/q1.json'). "
                 "Use for calculations, data processing, or testing logic safely."
             ),
             inputSchema={
@@ -343,7 +343,7 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="tool_code",
             description=(
-                "Alias for execute_python. Execute Python code in a secure Docker container. "
+                "Alias for execute_python. Execute Python code in an isolated uv environment. "
                 "Use this to run calculations, data processing, or test logic safely."
             ),
             inputSchema={
@@ -620,6 +620,67 @@ def _build_docker_cmd(
 
 
 async def _handle_execute(args: dict) -> list[TextContent]:
+    if EXECUTION_BACKEND == "docker":
+        return await _handle_execute_docker(args)
+    return await _handle_execute_uv(args)
+
+
+async def _handle_execute_uv(args: dict) -> list[TextContent]:
+    """Run code via `uv run` in a throw-away venv — no Docker required."""
+    code: str = args.get("code", "")
+    packages: list[str] | None = args.get("packages")
+    timeout = min(int(args.get("timeout", DEFAULT_TIMEOUT)), MAX_TIMEOUT)
+
+    if not code.strip():
+        return _err("No code provided")
+
+    # Inject DATA_DIR so scripts can reach vault files without knowing the host path.
+    preamble = f"DATA_DIR = {str(VAULT_ROOT)!r}\n"
+    full_code = preamble + code
+
+    tmp_dir = tempfile.mkdtemp(prefix="pysandbox_")
+    script_path = os.path.join(tmp_dir, "script.py")
+
+    try:
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(full_code)
+
+        cmd = ["uv", "run"]
+        if packages:
+            safe_pkgs = [p for p in packages if all(c.isalnum() or c in "-_.[]=<>!" for c in p)]
+            for pkg in safe_pkgs:
+                cmd += ["--with", pkg]
+        cmd += ["python", script_path]
+
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        try:
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                proc.communicate(), timeout=timeout + 10
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            return _err(f"Execution timed out after {timeout}s")
+
+        stdout = stdout_bytes.decode("utf-8", errors="replace")[:MAX_OUTPUT]
+        stderr = stderr_bytes.decode("utf-8", errors="replace")[:MAX_OUTPUT]
+        return _ok({"exit_code": proc.returncode, "stdout": stdout, "stderr": stderr})
+
+    except FileNotFoundError:
+        return _err("uv is not installed or not in PATH. Install it with: pip install uv")
+    except Exception as e:
+        return _err(f"Sandbox error: {e}")
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+async def _handle_execute_docker(args: dict) -> list[TextContent]:
+    """Original Docker-based executor (used when SYNAPSE_PYTHON_BACKEND=docker)."""
     code: str = args.get("code", "")
     packages: list[str] | None = args.get("packages")
     timeout = min(int(args.get("timeout", DEFAULT_TIMEOUT)), MAX_TIMEOUT)
@@ -662,14 +723,7 @@ async def _handle_execute(args: dict) -> list[TextContent]:
 
         stdout = stdout_bytes.decode("utf-8", errors="replace")[:MAX_OUTPUT]
         stderr = stderr_bytes.decode("utf-8", errors="replace")[:MAX_OUTPUT]
-
-        result: dict = {
-            "exit_code": proc.returncode,
-            "stdout": stdout,
-            "stderr": stderr,
-        }
-
-        return _ok(result)
+        return _ok({"exit_code": proc.returncode, "stdout": stdout, "stderr": stderr})
 
     except FileNotFoundError:
         return _err("Docker is not installed or not in PATH")

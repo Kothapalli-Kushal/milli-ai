@@ -1,4 +1,4 @@
-"""
+﻿"""
 Load LLM API keys from Postgres settings table and inject them into the
 worker process environment. Workers call this on startup so they can make
 LLM API calls without needing access to the local settings.json.
@@ -66,8 +66,8 @@ def inject_llm_env(settings: dict) -> None:
         if value and not os.environ.get(env_var):
             os.environ[env_var] = str(value)
 
-    # Also inject as the internal Synapse settings keys used by llm_providers.py
+    # Also inject as the internal Milli settings keys used by llm_providers.py
     for key, value in settings.items():
-        env_key = f"SYNAPSE_SETTING_{key.upper()}"
+        env_key = f"MILLI_SETTING_{key.upper()}"
         if value is not None and not os.environ.get(env_key):
             os.environ[env_key] = json.dumps(value)

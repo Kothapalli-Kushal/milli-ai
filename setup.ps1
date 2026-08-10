@@ -1,5 +1,5 @@
-﻿# Synapse AI Setup Script for Windows
-# Run with: irm https://raw.githubusercontent.com/synapseorch-ai/synapse-ai/main/setup.ps1 | iex
+﻿﻿# Milli AI Setup Script for Windows
+# Run with: irm https://raw.githubusercontent.com/synapseorch-ai/milli-ai/main/setup.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
@@ -375,15 +375,15 @@ function Show-PostgresInstructions {
 # ---------------------------------------------------------------------------
 # Main Setup Flow
 # ---------------------------------------------------------------------------
-function Start-SynapseSetup {
+function Start-MilliSetup {
     Write-Host ""
     Write-Host "========================================================" -ForegroundColor Cyan
-    Write-Host "   Synapse AI - Setup" -ForegroundColor Cyan
+    Write-Host "   Milli AI - Setup" -ForegroundColor Cyan
     Write-Host "========================================================" -ForegroundColor Cyan
     Write-Host ""
 
     # Fixed install location — always the same regardless of where the user runs this script
-    $InstallDir  = "$env:LOCALAPPDATA\Programs\SynapseAI"
+    $InstallDir  = "$env:LOCALAPPDATA\Programs\MilliAI"
     $MarkerFile  = "$InstallDir\.installed"
 
     # -----------------------------------------------------------------------
@@ -392,27 +392,27 @@ function Start-SynapseSetup {
     if (Test-Path $MarkerFile) {
         Write-Host ""
         Write-Host "======================================================" -ForegroundColor Green
-        Write-Host "   Synapse AI is already installed!" -ForegroundColor Green
+        Write-Host "   Milli AI is already installed!" -ForegroundColor Green
         Write-Host "======================================================" -ForegroundColor Green
         Write-Host ""
         Write-Host "   Location: $InstallDir" -ForegroundColor Cyan
         Write-Host ""
 
-        # Delegate to 'synapse upgrade' — it handles stop, download, rebuild
-        Write-Host "==> Running synapse upgrade..." -ForegroundColor Cyan
-        $SynapseBat = Join-Path $InstallDir "bin\synapse.bat"
-        if (Test-Path $SynapseBat) {
-            & $SynapseBat upgrade
+        # Delegate to 'milli upgrade' — it handles stop, download, rebuild
+        Write-Host "==> Running milli upgrade..." -ForegroundColor Cyan
+        $MilliBat = Join-Path $InstallDir "bin\milli.bat"
+        if (Test-Path $MilliBat) {
+            & $MilliBat upgrade
         } else {
-            throw "synapse.bat not found at $SynapseBat — installation may be corrupted."
+            throw "milli.bat not found at $MilliBat — installation may be corrupted."
         }
 
         Write-Host ""
         Write-Host "======================================================" -ForegroundColor Green
-        Write-Host "   Synapse AI has been updated!" -ForegroundColor Green
+        Write-Host "   Milli AI has been updated!" -ForegroundColor Green
         Write-Host "======================================================" -ForegroundColor Green
         Write-Host ""
-        Write-Host "To start Synapse:  synapse start" -ForegroundColor Cyan
+        Write-Host "To start Milli:  milli start" -ForegroundColor Cyan
         Write-Host ""
         return
     }
@@ -421,11 +421,11 @@ function Start-SynapseSetup {
 
     # Download latest release tarball from GitHub (no git required)
     Write-Host ""
-    Write-Host "Fetching latest Synapse AI release..." -ForegroundColor Cyan
+    Write-Host "Fetching latest Milli AI release..." -ForegroundColor Cyan
     try {
         $release = Invoke-RestMethod `
-            "https://api.github.com/repos/synapseorch-ai/synapse-ai/releases/latest" `
-            -Headers @{"User-Agent" = "synapse-install/1.0"} `
+            "https://api.github.com/repos/synapseorch-ai/milli-ai/releases/latest" `
+            -Headers @{"User-Agent" = "milli-install/1.0"} `
             -ErrorAction Stop
         $tarballUrl = $release.tarball_url
     } catch {
@@ -467,7 +467,7 @@ function Start-SynapseSetup {
         }
         $oldErrPref = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
-        git clone https://github.com/synapseorch-ai/synapse-ai.git $InstallDir
+        git clone https://github.com/synapseorch-ai/milli-ai.git $InstallDir
         $ErrorActionPreference = $oldErrPref
     }
 
@@ -483,27 +483,27 @@ function Start-SynapseSetup {
             & $global:PYTHON_CMD $SetupScript
         }
 
-        # Add the synapse bin dir to the PowerShell profile for future sessions
+        # Add the milli bin dir to the PowerShell profile for future sessions
         $BinDir      = Join-Path $InstallDir "bin"
         $ProfileFile = $PROFILE.CurrentUserAllHosts
         if (-not (Test-Path $ProfileFile)) {
             New-Item -ItemType File -Path $ProfileFile -Force | Out-Null
         }
         $ProfileContent = Get-Content $ProfileFile -Raw -ErrorAction SilentlyContinue
-        if ($ProfileContent -notlike "*SynapseAI*") {
-            Add-Content -Path $ProfileFile -Value "`n# Synapse AI`n`$env:Path = `"$BinDir;`$env:Path`""
-            Write-Host "[OK] Added Synapse to PowerShell profile ($ProfileFile)" -ForegroundColor Green
+        if ($ProfileContent -notlike "*MilliAI*") {
+            Add-Content -Path $ProfileFile -Value "`n# Milli AI`n`$env:Path = `"$BinDir;`$env:Path`""
+            Write-Host "[OK] Added Milli to PowerShell profile ($ProfileFile)" -ForegroundColor Green
         }
 
         Write-Host ""
         Write-Host "========================================================" -ForegroundColor Green
-        Write-Host "   Synapse AI setup complete!" -ForegroundColor Green
-        Write-Host "   To start Synapse:  synapse start" -ForegroundColor Cyan
+        Write-Host "   Milli AI setup complete!" -ForegroundColor Green
+        Write-Host "   To start Milli:  milli start" -ForegroundColor Cyan
         Write-Host "   Installed at:      $InstallDir" -ForegroundColor Cyan
         Write-Host ""
-        Write-Host "   To upgrade in the future:  synapse upgrade" -ForegroundColor Cyan
-        Write-Host "   (pip users: pip install --upgrade synapse-orch-ai)" -ForegroundColor Gray
-        Write-Host "   (npm users: npm update -g synapse-orch-ai)" -ForegroundColor Gray
+        Write-Host "   To upgrade in the future:  milli upgrade" -ForegroundColor Cyan
+        Write-Host "   (pip users: pip install --upgrade milli-orch-ai)" -ForegroundColor Gray
+        Write-Host "   (npm users: npm update -g milli-orch-ai)" -ForegroundColor Gray
         Write-Host "========================================================" -ForegroundColor Green
     } else {
         throw "Could not find installation directory: $InstallDir"
@@ -512,7 +512,7 @@ function Start-SynapseSetup {
 
 # Run the setup
 try {
-    Start-SynapseSetup
+    Start-MilliSetup
 } catch {
     Write-Host ""
     Write-Host "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" -ForegroundColor Red
