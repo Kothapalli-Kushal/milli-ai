@@ -50,8 +50,8 @@ MCP_SERVERS_FILE = os.path.join(DATA_DIR, "mcp_servers.json")
 MCP_TOKENS_DIR   = os.path.join(DATA_DIR, "mcp_tokens")
 
 # Redirect URI registered with OAuth servers.
-# Reads MILLI_BACKEND_PORT from env so it matches the running port.
-_BACKEND_PORT = int(os.getenv("MILLI_BACKEND_PORT", "8765"))
+# Reads SYNAPSE_BACKEND_PORT from env so it matches the running port.
+_BACKEND_PORT = int(os.getenv("SYNAPSE_BACKEND_PORT", "8765"))
 OAUTH_CALLBACK_URL = f"http://localhost:{_BACKEND_PORT}/api/mcp/oauth/callback"
 
 
@@ -110,7 +110,7 @@ def _make_oauth_provider(
     return OAuthClientProvider(
         server_url=url,
         client_metadata=OAuthClientMetadata(
-            client_name="Milli AI",
+            client_name="Synapse AI",
             redirect_uris=[AnyUrl(OAUTH_CALLBACK_URL)],
             grant_types=["authorization_code", "refresh_token"],
             response_types=["code"],

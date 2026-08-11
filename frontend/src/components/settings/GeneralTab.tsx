@@ -567,7 +567,7 @@ export function GeneralTab({
                                 <li>Full backend filesystem access (including <code className="text-zinc-300">backend/data/</code>)</li>
                                 <li>Full network access</li>
                                 <li>Access to any GPU and all host RAM</li>
-                                <li>The same permissions as the Synapse backend process</li>
+                                <li>The same permissions as the Milli backend process</li>
                             </ul>
                             <p className="text-amber-400/90 pt-1">
                                 Only enable this on a self-hosted instance you control. It is the wrong choice for any deployment where untrusted code or untrusted users can reach the Transform step.
@@ -601,7 +601,7 @@ export function GeneralTab({
                 <div className="flex items-center justify-between">
                     <div>
                         <p className="text-sm text-zinc-300 font-medium">Require Login</p>
-                        <p className="text-xs text-zinc-600 mt-0.5">Protect Synapse with a username and password.</p>
+                        <p className="text-xs text-zinc-600 mt-0.5">Protect Milli with a username and password.</p>
                     </div>
                     <button
                         onClick={() => {

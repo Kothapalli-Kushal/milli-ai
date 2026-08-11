@@ -1,4 +1,4 @@
-﻿name: Docker build
+﻿﻿name: Docker build
 
 # Builds every published image so a Dockerfile/dependency break is caught before
 # release, and boots the API-server image to confirm it actually serves. Runs
@@ -59,7 +59,7 @@ jobs:
           platforms: linux/amd64
           push: false
           load: false
-          tags: milli-ci/${{ matrix.scope }}:ci
+          tags: synapse-ci/${{ matrix.scope }}:ci
           cache-from: type=gha,scope=${{ matrix.scope }}
           cache-to: type=gha,mode=max,scope=${{ matrix.scope }}
 
@@ -76,11 +76,11 @@ jobs:
           platforms: linux/amd64
           push: false
           load: true
-          tags: milli-ci/api-server:test
+          tags: synapse-ci/api-server:test
           cache-from: type=gha,scope=api-server
       - name: Boot the container and hit the health endpoint
         run: |
-          docker run -d --name syn -p 8765:8765 -v /tmp/syndata:/data milli-ci/api-server:test
+          docker run -d --name syn -p 8765:8765 -v /tmp/syndata:/data synapse-ci/api-server:test
           ok=0
           for i in $(seq 1 60); do
             if curl -fsS http://localhost:8765/openapi.json >/dev/null 2>&1; then

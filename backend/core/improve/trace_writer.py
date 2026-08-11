@@ -1,5 +1,5 @@
 ﻿"""
-Trace writer for the Milli Self-Improvement subsystem (Checkpoint 1).
+Trace writer for the Synapse Self-Improvement subsystem (Checkpoint 1).
 
 Consumes the existing `run_agent_step` / `OrchestrationEngine.run` event
 streams and writes one schema-valid trace JSON per run on close. See
@@ -47,10 +47,10 @@ GIVE_UP_RE = re.compile(
 # spawn_subtask) see their parent's writer here; agent runs inside an
 # orchestration step see the orchestration writer.
 _current_agent_trace: contextvars.ContextVar = contextvars.ContextVar(
-    "milli_improve_agent_trace", default=None
+    "synapse_improve_agent_trace", default=None
 )
 _current_orch_trace: contextvars.ContextVar = contextvars.ContextVar(
-    "milli_improve_orch_trace", default=None
+    "synapse_improve_orch_trace", default=None
 )
 
 

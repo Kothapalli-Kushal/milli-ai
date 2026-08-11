@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Bot, User, Settings, Terminal, Sun, Moon, Plus, ChevronDown, ChevronRight, Zap, GitBranch, CheckCircle2, AlertCircle, History, RefreshCw, Clock, Trash2, X, Paperclip, ImageIcon, Cpu, Wrench, Network, CalendarClock, Sparkles, Copy, Check, Brain} from 'lucide-react';
@@ -398,7 +398,7 @@ function WelcomeScreen({ agentName, onPrompt, onNavigate, showExamplesBanner, on
         What can I help you Achieve?
       </h2>
       <p className="text-zinc-500 text-sm mb-10 text-center font-mono">
-        Synapse AI — Agents that work together to get things done
+        Milli AI — Agents that work together to get things done
       </p>
 
       {/* Tips Carousel */}
@@ -1508,7 +1508,7 @@ export default function Home() {
                   {agentName}
                 </span>
                 <span className="text-zinc-500 shrink-0">-</span>
-                <span className="text-zinc-400 shrink-0">Synapse AI</span>
+                <span className="text-zinc-400 shrink-0">Milli AI</span>
               </h1>
             </div>
             <div className="flex items-center">

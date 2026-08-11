@@ -2,7 +2,7 @@
 Profiling API routes.
 
 Timing stats: always available (GET /api/profiling/stats).
-CPU / memory endpoints: require MILLI_PROFILING=true.
+CPU / memory endpoints: require SYNAPSE_PROFILING=true.
 """
 
 from fastapi import APIRouter, Query

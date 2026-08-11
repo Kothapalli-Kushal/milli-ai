@@ -7,12 +7,12 @@ import threading
 from typing import Optional
 
 
-class MilliS3:
+class SynapseS3:
     def __init__(
         self,
         bucket: str,
         region: str = "us-east-1",
-        prefix: str = "milli",
+        prefix: str = "synapse",
         access_key_id: str = "",
         secret_access_key: str = "",
         endpoint_url: str = "",
@@ -107,13 +107,13 @@ class MilliS3:
 # ── Module-level singleton ─────────────────────────────────────────────────────
 
 _lock = threading.Lock()
-_instance: Optional[MilliS3] = None
+_instance: Optional[SynapseS3] = None
 _last_bucket: str = ""
 
 
-def get_s3() -> Optional[MilliS3]:
+def get_s3() -> Optional[SynapseS3]:
     """
-    Return the shared MilliS3 instance, or None when S3 is not configured.
+    Return the shared SynapseS3 instance, or None when S3 is not configured.
     Re-initialises automatically if the bucket setting changes.
     """
     global _instance, _last_bucket
@@ -128,7 +128,7 @@ def get_s3() -> Optional[MilliS3]:
 
     with _lock:
         if _instance is None or cfg.s3_bucket != _last_bucket:
-            _instance = MilliS3(
+            _instance = SynapseS3(
                 bucket=cfg.s3_bucket,
                 region=cfg.s3_region,
                 prefix=cfg.s3_prefix,

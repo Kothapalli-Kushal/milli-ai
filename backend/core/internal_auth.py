@@ -3,16 +3,16 @@ Internal Token Middleware
 -------------------------
 Protects all /api/* routes from direct external access.
 
-Only the Next.js frontend knows the MILLI_INTERNAL_TOKEN and injects it
-as an X-Milli-Internal header on every proxied request. External callers
+Only the Next.js frontend knows the SYNAPSE_INTERNAL_TOKEN and injects it
+as an X-Synapse-Internal header on every proxied request. External callers
 that try to hit /api/settings, /api/agents, etc. directly will get 403.
 
 Rules:
 - /api/v1/*, /api/v2/*, ... → SKIP (external versioned API; uses API key auth instead)
 - /docs, /openapi.json, /redoc  → SKIP (FastAPI docs)
 - /chat*, /auth/*    → SKIP (direct backend routes, not under /api/)
-- /api/*             → REQUIRE X-Milli-Internal header
-- If MILLI_INTERNAL_TOKEN is not set → permissive (backward compatible)
+- /api/*             → REQUIRE X-Synapse-Internal header
+- If SYNAPSE_INTERNAL_TOKEN is not set → permissive (backward compatible)
 """
 import os
 import re
@@ -27,7 +27,7 @@ class InternalTokenMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app):
         super().__init__(app)
-        self.token = os.getenv("MILLI_INTERNAL_TOKEN", "")
+        self.token = os.getenv("SYNAPSE_INTERNAL_TOKEN", "")
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -55,7 +55,7 @@ class InternalTokenMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # This is an /api/* route — require internal token
-        provided = request.headers.get("X-Milli-Internal", "")
+        provided = request.headers.get("X-Synapse-Internal", "")
         if provided != self.token:
             return JSONResponse(
                 status_code=403,

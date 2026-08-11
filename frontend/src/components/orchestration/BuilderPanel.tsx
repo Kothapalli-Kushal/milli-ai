@@ -175,7 +175,7 @@ function markLastRunningComplete(msgs: ChatMessage[]): ChatMessage[] {
 const BUILDER_WELCOME_MESSAGE: ChatMessage = {
     role: 'assistant',
     content:
-        "Hi! I'm the Synapse Builder. Tell me what kind of agent or orchestration you'd like to build, and I'll ask any clarifying questions before creating it.\n\nFor example:\n- *\"Build a research workflow that searches the web and writes a summary to the vault\"*\n- *\"Create an agent that monitors my emails and drafts replies\"*",
+        "Hi! I'm the Milli Builder. Tell me what kind of agent or orchestration you'd like to build, and I'll ask any clarifying questions before creating it.\n\nFor example:\n- *\"Build a research workflow that searches the web and writes a summary to the vault\"*\n- *\"Create an agent that monitors my emails and drafts replies\"*",
     kind: 'text',
 };
 

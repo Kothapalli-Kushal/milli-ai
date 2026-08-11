@@ -1,5 +1,5 @@
 ﻿"""
-Builder tools for the Milli AI Builder agent.
+Builder tools for the Synapse AI Builder agent.
 
 Provides CRUD operations on agents and orchestrations that the builder
 meta-agent can call to design and create multi-agent workflows.
@@ -796,7 +796,7 @@ async def _dispatch(tool_name: str, args: dict, server_module: Any) -> Any:
                     errors.append({"index": i, "role": spec.get("role"), "error": f"missing required field '{field}'"})
                     break
             else:
-                # Guarantee uniqueness even when called repeatedly in the same millisecond.
+                # Guarantee uniqueness even when called repeatedly in the same synapsesecond.
                 new_id = _random_id("agent_", length=10)
                 while new_id in existing_ids:
                     new_id = _random_id("agent_", length=10)

@@ -18,7 +18,7 @@ async def deliver_webhook(
 ) -> bool:
     """
     POST payload to webhook_url.
-    Signs with HMAC-SHA256 if secret is provided (X-Milli-Signature header).
+    Signs with HMAC-SHA256 if secret is provided (X-Synapse-Signature header).
     Returns True on 2xx response, False after max_retries exhausted.
     """
     import httpx
@@ -27,13 +27,13 @@ async def deliver_webhook(
 
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": "Milli-Webhook/1.0",
-        "X-Milli-Timestamp": str(int(time.time())),
+        "User-Agent": "Synapse-Webhook/1.0",
+        "X-Synapse-Timestamp": str(int(time.time())),
     }
 
     if secret:
         sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-        headers["X-Milli-Signature"] = f"sha256={sig}"
+        headers["X-Synapse-Signature"] = f"sha256={sig}"
 
     for attempt in range(max_retries):
         try:

@@ -1,22 +1,22 @@
-﻿services:
+﻿﻿services:
   backend:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: milli-backend
+    container_name: synapse-backend
     env_file:
       - .env
     environment:
-      - MILLI_DATA_DIR=/data
+      - SYNAPSE_DATA_DIR=/data
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host-gateway:11434}
-      - CORS_ORIGINS=http://localhost:${MILLI_FRONTEND_PORT:-3000}
-      - MILLI_INTERNAL_TOKEN=${MILLI_INTERNAL_TOKEN}
+      - CORS_ORIGINS=http://localhost:${SYNAPSE_FRONTEND_PORT:-3000}
+      - SYNAPSE_INTERNAL_TOKEN=${SYNAPSE_INTERNAL_TOKEN}
     volumes:
-      - milli-data:/data
+      - synapse-data:/data
       - ./backend/data:/data
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "${MILLI_BACKEND_PORT:-8765}:8765"
+      - "${SYNAPSE_BACKEND_PORT:-8765}:8765"
     extra_hosts:
       - "host-gateway:host-gateway"
     healthcheck:
@@ -35,15 +35,15 @@
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        BACKEND_URL: http://milli-backend:8765
-    container_name: milli-frontend
+        BACKEND_URL: http://synapse-backend:8765
+    container_name: synapse-frontend
     env_file:
       - .env
     environment:
-      - BACKEND_URL=http://milli-backend:8765
-      - MILLI_INTERNAL_TOKEN=${MILLI_INTERNAL_TOKEN}
+      - BACKEND_URL=http://synapse-backend:8765
+      - SYNAPSE_INTERNAL_TOKEN=${SYNAPSE_INTERNAL_TOKEN}
     ports:
-      - "${MILLI_FRONTEND_PORT:-3000}:3000"
+      - "${SYNAPSE_FRONTEND_PORT:-3000}:3000"
     depends_on:
       backend:
         condition: service_healthy
@@ -57,12 +57,12 @@
   redis:
     image: redis:7-alpine
     profiles: [scale]
-    container_name: milli-redis
+    container_name: synapse-redis
     command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - milli-redis-data:/data
+      - synapse-redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -73,18 +73,18 @@
       - default
 
   worker:
-    image: ${DOCKERHUB_USERNAME:-synapseorchai}/milli-ai-worker:${MILLI_VERSION:-latest}
+    image: ${DOCKERHUB_USERNAME:-synapseorchai}/synapse-ai-worker:${SYNAPSE_VERSION:-latest}
     build:
       context: .
       dockerfile: Dockerfile.worker
     profiles: [scale]
-    container_name: milli-worker
+    container_name: synapse-worker
     env_file:
       - .env
     environment:
-      - REDIS_URL=redis://milli-redis:6379/0
+      - REDIS_URL=redis://synapse-redis:6379/0
       - SCALE_POSTGRES_URL=${SCALE_POSTGRES_URL}
-      - MILLI_DATA_DIR=/data
+      - SYNAPSE_DATA_DIR=/data
       - WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-10}
       - WORKER_JOB_TIMEOUT=${WORKER_JOB_TIMEOUT:-3600}
       - WORKER_MAX_RETRIES=${WORKER_MAX_RETRIES:-3}
@@ -97,14 +97,14 @@
       - K8S_MODE=0
       - S3_BUCKET=${S3_BUCKET:-}
       - S3_REGION=${S3_REGION:-us-east-1}
-      - S3_PREFIX=${S3_PREFIX:-milli}
+      - S3_PREFIX=${S3_PREFIX:-synapse}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID:-}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY:-}
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
       - OTLP_ENDPOINT=${OTLP_ENDPOINT:-}
       - METRICS_TOKEN=${METRICS_TOKEN:-}
     volumes:
-      - milli-data:/data
+      - synapse-data:/data
       - ./backend/data:/data
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
@@ -129,11 +129,11 @@
   pgbouncer:
     image: pgbouncer/pgbouncer:latest
     profiles: [enterprise]
-    container_name: milli-pgbouncer
+    container_name: synapse-pgbouncer
     environment:
       - DATABASES_HOST=${POSTGRES_HOST:-postgres}
       - DATABASES_PORT=${POSTGRES_PORT:-5432}
-      - DATABASES_DBNAME=${POSTGRES_DB:-milli}
+      - DATABASES_DBNAME=${POSTGRES_DB:-synapse}
       - DATABASES_USER=${POSTGRES_USER:-postgres}
       - DATABASES_PASSWORD=${POSTGRES_PASSWORD:-}
       - PGBOUNCER_POOL_MODE=transaction
@@ -148,7 +148,7 @@
   jaeger:
     image: jaegertracing/all-in-one:latest
     profiles: [enterprise]
-    container_name: milli-jaeger
+    container_name: synapse-jaeger
     ports:
       - "16686:16686"
       - "4317:4317"
@@ -161,7 +161,7 @@
   prometheus:
     image: prom/prometheus:latest
     profiles: [enterprise]
-    container_name: milli-prometheus
+    container_name: synapse-prometheus
     volumes:
       - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
@@ -173,12 +173,12 @@
   grafana:
     image: grafana/grafana:latest
     profiles: [enterprise]
-    container_name: milli-grafana
+    container_name: synapse-grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-milli}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-synapse}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
-      - milli-grafana-data:/var/lib/grafana
+      - synapse-grafana-data:/var/lib/grafana
     ports:
       - "3001:3000"
     restart: unless-stopped
@@ -186,13 +186,13 @@
       - default
 
 volumes:
-  milli-data:
+  synapse-data:
     driver: local
-  milli-redis-data:
+  synapse-redis-data:
     driver: local
-  milli-grafana-data:
+  synapse-grafana-data:
     driver: local
 
 networks:
   default:
-    name: milli-network
+    name: synapse-network

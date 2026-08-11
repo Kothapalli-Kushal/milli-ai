@@ -5,7 +5,7 @@ from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-_data_dir_env = os.getenv("MILLI_DATA_DIR", "")
+_data_dir_env = os.getenv("SYNAPSE_DATA_DIR", "")
 if _data_dir_env:
     _p = Path(_data_dir_env)
     DATA_DIR = str(_p if _p.is_absolute() else _PROJECT_ROOT / _p)
@@ -38,19 +38,19 @@ def _env_int(name: str, default: int) -> int:
 
 
 # Timeouts (seconds, unless the name says otherwise).
-MCP_SESSION_READ_TIMEOUT = _env_float("MILLI_MCP_SESSION_READ_TIMEOUT", 60.0)
-MCP_TOOL_CALL_TIMEOUT    = _env_float("MILLI_MCP_TOOL_CALL_TIMEOUT", 60.0)
-MCP_LIST_TOOLS_TIMEOUT   = _env_float("MILLI_MCP_LIST_TOOLS_TIMEOUT", 15.0)
-LLM_REQUEST_TIMEOUT      = _env_float("MILLI_LLM_TIMEOUT", 180.0)
-HTTP_TOOL_TIMEOUT        = _env_float("MILLI_HTTP_TOOL_TIMEOUT", 30.0)
-ORCH_STEP_TIMEOUT        = _env_float("MILLI_ORCH_STEP_TIMEOUT", 300.0)
-ORCH_GLOBAL_TIMEOUT_MIN  = _env_int("MILLI_ORCH_GLOBAL_TIMEOUT_MINUTES", 30)
-ORCH_HUMAN_TIMEOUT       = _env_float("MILLI_ORCH_HUMAN_TIMEOUT", 3600.0)
+MCP_SESSION_READ_TIMEOUT = _env_float("SYNAPSE_MCP_SESSION_READ_TIMEOUT", 60.0)
+MCP_TOOL_CALL_TIMEOUT    = _env_float("SYNAPSE_MCP_TOOL_CALL_TIMEOUT", 60.0)
+MCP_LIST_TOOLS_TIMEOUT   = _env_float("SYNAPSE_MCP_LIST_TOOLS_TIMEOUT", 15.0)
+LLM_REQUEST_TIMEOUT      = _env_float("SYNAPSE_LLM_TIMEOUT", 180.0)
+HTTP_TOOL_TIMEOUT        = _env_float("SYNAPSE_HTTP_TOOL_TIMEOUT", 30.0)
+ORCH_STEP_TIMEOUT        = _env_float("SYNAPSE_ORCH_STEP_TIMEOUT", 300.0)
+ORCH_GLOBAL_TIMEOUT_MIN  = _env_int("SYNAPSE_ORCH_GLOBAL_TIMEOUT_MINUTES", 30)
+ORCH_HUMAN_TIMEOUT       = _env_float("SYNAPSE_ORCH_HUMAN_TIMEOUT", 3600.0)
 
 
 def load_settings():
     default_settings = {
-        "agent_name": "Milli",
+        "agent_name": "Synapse",
         "model": "ollama.mistral",
         "mode": "local",
         "openai_key": "",
@@ -140,10 +140,10 @@ def load_settings():
 
     settings = {**default_settings, **file_settings}
 
-    # In scale worker mode, inject_llm_env() populates MILLI_SETTING_* env vars
+    # In scale worker mode, inject_llm_env() populates SYNAPSE_SETTING_* env vars
     # from Postgres. Overlay them here so all callers of load_settings() see the
     # Postgres-sourced values without needing access to the local settings.json.
-    _prefix = "MILLI_SETTING_"
+    _prefix = "SYNAPSE_SETTING_"
     for _env_key, _env_val in os.environ.items():
         if _env_key.startswith(_prefix):
             _setting_key = _env_key[len(_prefix):].lower()
@@ -156,14 +156,14 @@ def load_settings():
 
 
 def get_or_create_jwt_secret() -> str:
-    """Return MILLI_JWT_SECRET from the environment or .env file.
+    """Return SYNAPSE_JWT_SECRET from the environment or .env file.
 
-    Persistence is handled by the CLI (milli/cli.py) before the server starts.
+    Persistence is handled by the CLI (synapse/cli.py) before the server starts.
     If the secret is missing here (e.g. server run directly without the CLI),
     an ephemeral in-memory value is used for this session only.
     """
     env_file = _PROJECT_ROOT / ".env"
-    var = "MILLI_JWT_SECRET"
+    var = "SYNAPSE_JWT_SECRET"
 
     existing = os.environ.get(var, "")
     if existing:
@@ -185,7 +185,7 @@ def get_or_create_jwt_secret() -> str:
     os.environ[var] = secret
     print(
         f"Warning: {var} was not found; generated an ephemeral in-memory secret. "
-        f"Set {var} in the environment (or run 'milli start') to persist across restarts."
+        f"Set {var} in the environment (or run 'synapse start') to persist across restarts."
     )
     return secret
 

@@ -1,5 +1,5 @@
 ﻿"""
-Benchmark suite for the Milli Self-Improvement subsystem (Checkpoint 4).
+Benchmark suite for the Synapse Self-Improvement subsystem (Checkpoint 4).
 
 Benchmarks are STANDALONE objects (§0.6.1) stored at
 `benchmarks/<benchmark_id>.json`, referenced by id, and reusable across
@@ -9,7 +9,7 @@ targets (the run entry point accepts a target override). Schema (Appendix A):
      inputs: [{prompt, expected_metric_hints, images?}],
      scorer: {metrics: {name: weight}}}
 
-Execution goes through Milli's authoritative surfaces only: each input runs
+Execution goes through Synapse's authoritative surfaces only: each input runs
 through `run_agent_step` (agents) or `OrchestrationEngine.run`
 (orchestrations), so traces are emitted by the Checkpoint-1 hook path — there
 is no separate benchmark trace mechanism. Detectors then score the collected
@@ -94,7 +94,7 @@ class BenchmarkTargetNotFound(Exception):
 # ── Schema (checklist 4.1; extended per Appendix A6) ──────────────────────────
 
 class ExecutionEnv(BaseModel):
-    """References an EXISTING Milli SQL connection by id (checklist 6.40).
+    """References an EXISTING Synapse SQL connection by id (checklist 6.40).
     CP6 introduces no connection manager, credential store, or DB config."""
     connection_id: str
     snapshot_id: str | None = None

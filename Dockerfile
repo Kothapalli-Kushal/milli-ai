@@ -1,4 +1,4 @@
-﻿# Stage 1: Build Next.js frontend
+﻿﻿# Stage 1: Build Next.js frontend
 FROM node:20-alpine AS frontend-builder
 ARG BACKEND_URL=http://localhost:8765
 ENV BACKEND_URL=$BACKEND_URL
@@ -32,13 +32,13 @@ COPY --from=frontend-builder /app/.next/standalone ./
 COPY --from=frontend-builder /app/.next/static ./.next/static
 COPY --from=frontend-builder /app/public ./public
 
-COPY docker/supervisord.conf /etc/supervisor/conf.d/milli.conf
+COPY docker/supervisord.conf /etc/supervisor/conf.d/synapse.conf
 
-ENV MILLI_DATA_DIR=/data
+ENV SYNAPSE_DATA_DIR=/data
 ENV PYTHONPATH=/app/backend
 ENV NODE_ENV=production
-ENV MILLI_BACKEND_PORT=8765
-ENV MILLI_FRONTEND_PORT=3000
+ENV SYNAPSE_BACKEND_PORT=8765
+ENV SYNAPSE_FRONTEND_PORT=3000
 
 EXPOSE 3000 8765
 

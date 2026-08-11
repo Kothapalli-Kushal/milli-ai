@@ -1,7 +1,7 @@
 ﻿"""
 V1 External API Endpoints
 --------------------------
-Programmatic API for external apps to interact with Milli agents
+Programmatic API for external apps to interact with Synapse agents
 and orchestrations. All routes are protected by API key auth (Bearer token).
 
 Endpoints:

@@ -1,19 +1,19 @@
-﻿{
-  "name": "milli-orch-ai",
+﻿﻿{
+  "name": "synapse-orch-ai",
   "version": "1.8.2",
-  "description": "Milli - A Multi Agent Orchestrator",
+  "description": "Synapse - A Multi Agent Orchestrator",
   "keywords": ["ai", "agent", "mcp", "llm", "orchestrator", "local", "ollama"],
-  "homepage": "https://github.com/synapseorch-ai/milli-ai",
+  "homepage": "https://github.com/synapseorch-ai/synapse-ai",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/synapseorch-ai/milli-ai.git"
+    "url": "git+https://github.com/synapseorch-ai/synapse-ai.git"
   },
   "bugs": {
-    "url": "https://github.com/synapseorch-ai/milli-ai/issues"
+    "url": "https://github.com/synapseorch-ai/synapse-ai/issues"
   },
   "license": "AGPL-3.0-only",
   "bin": {
-    "milli": "./bin/milli.js"
+    "synapse": "./bin/synapse.js"
   },
   "files": [
     "bin/",

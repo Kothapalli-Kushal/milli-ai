@@ -1,5 +1,5 @@
-﻿"""
-Milli AI -- Interactive Setup Wizard
+﻿﻿"""
+Synapse AI -- Interactive Setup Wizard
 Guides the user through configuration, installs dependencies, and starts both servers.
 Uses only Python stdlib so it works before the venv exists.
 """
@@ -23,7 +23,7 @@ ENV_FILE = os.path.join(ROOT_DIR, ".env")
 
 # ---------------------------------------------------------------------------
 # Load .env BEFORE computing DATA_DIR so that setup.py and cli.py always
-# agree on the same data directory (e.g. MILLI_DATA_DIR=backend/data).
+# agree on the same data directory (e.g. SYNAPSE_DATA_DIR=backend/data).
 # ---------------------------------------------------------------------------
 def _load_dotenv_early(path):
     """Minimal .env loader -- only sets vars not already in the environment."""
@@ -46,7 +46,7 @@ def _load_dotenv_early(path):
 _load_dotenv_early(ENV_FILE)
 
 # Resolve DATA_DIR: relative paths are anchored to ROOT_DIR (same logic as cli.py)
-_raw_data_dir = os.environ.get("MILLI_DATA_DIR", os.path.join(BACKEND_DIR, "data"))
+_raw_data_dir = os.environ.get("SYNAPSE_DATA_DIR", os.path.join(BACKEND_DIR, "data"))
 if not os.path.isabs(_raw_data_dir):
     DATA_DIR = os.path.normpath(os.path.join(ROOT_DIR, _raw_data_dir))
 else:
@@ -57,8 +57,8 @@ SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 CREDENTIALS_FILE = os.path.join(DATA_DIR, "credentials.json")
 
 # Port defaults -- read from env first so an existing .env is respected
-DEFAULT_BACKEND_PORT = int(os.environ.get("MILLI_BACKEND_PORT", "8765"))
-DEFAULT_FRONTEND_PORT = int(os.environ.get("MILLI_FRONTEND_PORT", "3000"))
+DEFAULT_BACKEND_PORT = int(os.environ.get("SYNAPSE_BACKEND_PORT", "8765"))
+DEFAULT_FRONTEND_PORT = int(os.environ.get("SYNAPSE_FRONTEND_PORT", "3000"))
 
 IS_WIN = sys.platform == "win32"
 VENV_DIR = os.path.join(BACKEND_DIR, "venv")
@@ -303,7 +303,7 @@ def install_pgvector():
         warn("pgvector installation had issues. You may need to install manually.")
         return False
 
-def create_postgresql_db(db_user, db_password, db_name="milli"):
+def create_postgresql_db(db_user, db_password, db_name="synapse"):
     """Create a PostgreSQL database and return the connection URL"""
     step("Setting up PostgreSQL Database")
     
@@ -698,7 +698,7 @@ DEFAULT_MODEL_PRICING = {
 }
 
 DEFAULT_SETTINGS = {
-    "agent_name": "Milli",
+    "agent_name": "Synapse",
     "model": "",
     "mode": "cloud",
     "openai_key": "",
@@ -774,10 +774,10 @@ def save_settings(cfg):
         except Exception:
             pass
 
-    # Persist the data directory path into .env so cli.py and milli start
+    # Persist the data directory path into .env so cli.py and synapse start
     # always find settings in the same location, even with relative paths.
     _rel = os.path.relpath(DATA_DIR, ROOT_DIR)
-    _update_env_file("MILLI_DATA_DIR", _rel)
+    _update_env_file("SYNAPSE_DATA_DIR", _rel)
 
 # ---------------------------------------------------------------------------
 # Q1 -- Coding Agent
@@ -815,13 +815,13 @@ def ask_embed_code(cfg):
     if ask_yn("Is this a fresh PostgreSQL install (use default credentials)?", default="n"):
         db_user = "postgres"
         db_password = ""
-        db_name = "milli"
+        db_name = "synapse"
         ok("Using default PostgreSQL credentials (postgres user, peer authentication).")
     else:
         info("Configuring PostgreSQL database for code indexing...")
         db_user = ask("PostgreSQL username", default="postgres")
         db_password = ask("PostgreSQL password", default="")
-        db_name = ask("Database name", default="milli")
+        db_name = ask("Database name", default="synapse")
 
     # Try to install pgvector
     install_pgvector()
@@ -854,7 +854,7 @@ def ask_embed_code(cfg):
     else:
         warn("Could not auto-create database. Please set it up manually.")
         url = ask("PostgreSQL connection URL",
-                  default="postgresql://postgres:@localhost:5432/milli")
+                  default="postgresql://postgres:@localhost:5432/synapse")
         if url.startswith("postgresql"):
             cfg["sql_connection_string"] = url
             ok(f"Saved: {_redact_url(url)}")
@@ -966,7 +966,7 @@ def _gcloud_enable_apis(project_id):
 def ask_google_workspace(cfg):
     """Optional step: Set up Google Workspace OAuth credentials."""
     step("Google Workspace Integration")
-    info("Powers Gmail, Drive, Calendar, Docs, Tasks, and more in Milli.")
+    info("Powers Gmail, Drive, Calendar, Docs, Tasks, and more in Synapse.")
 
     # Get backend port from config (or default)
     backend_port = cfg.get("backend_port", DEFAULT_BACKEND_PORT)
@@ -1088,7 +1088,7 @@ def ask_google_workspace(cfg):
         with open(CREDENTIALS_FILE, "w", encoding="utf-8") as f:
             json.dump(parsed, f, indent=4)
         ok(f"credentials.json saved to {CREDENTIALS_FILE}")
-        info("After Milli starts, go to Settings -> Integrations -> 'Connect Google Account' to complete OAuth.")
+        info("After Synapse starts, go to Settings -> Integrations -> 'Connect Google Account' to complete OAuth.")
     except json.JSONDecodeError as e:
         err(f"Invalid JSON: {e}")
         warn("credentials.json was NOT saved. Configure via Settings -> Integrations later.")
@@ -1099,8 +1099,8 @@ def ask_google_workspace(cfg):
 # ---------------------------------------------------------------------------
 def ask_agent_name(cfg):
     step("Agent Name")
-    name = ask("Enter a name for your AI Setup", default=cfg.get("agent_name") or "Milli")
-    cfg["agent_name"] = name or "Milli"
+    name = ask("Enter a name for your AI Setup", default=cfg.get("agent_name") or "Synapse")
+    cfg["agent_name"] = name or "Synapse"
     ok(f"Agent name set to: {cfg['agent_name']}")
 
 # ---------------------------------------------------------------------------
@@ -1562,8 +1562,8 @@ def ask_llm(cfg):
 # Default Agent Creation
 # ---------------------------------------------------------------------------
 DEFAULT_AGENT = {
-    "id": "agent_milli_ai",
-    "name": "Milli AI",
+    "id": "agent_synapse_ai",
+    "name": "Synapse AI",
     "description": "Your all-purpose AI assistant with access to every capability -- browsing, code execution, file management, and more.",
     "avatar": "default",
     "type": "conversational",
@@ -1571,7 +1571,7 @@ DEFAULT_AGENT = {
     "repos": [],
     "system_prompt": (
         "# Role & Identity\n"
-        "You are Milli AI -- an elite, all-purpose AI assistant with access to the full suite of tools on this platform. "
+        "You are Synapse AI -- an elite, all-purpose AI assistant with access to the full suite of tools on this platform. "
         "You exist to help the user accomplish any task with speed, accuracy, and clarity.\n\n"
         "# Core Capabilities\n"
         "You can browse the web and extract real information from any source.\n"
@@ -1598,7 +1598,7 @@ DEFAULT_AGENT = {
 }
 
 def create_default_agent():
-    """Ensure the default 'Milli AI' agent exists in user_agents.json."""
+    """Ensure the default 'Synapse AI' agent exists in user_agents.json."""
     step("Creating Default Agent")
     agents_file = os.path.join(DATA_DIR, "user_agents.json")
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -1613,22 +1613,22 @@ def create_default_agent():
 
     # Check if already exists
     if any(a.get("id") == DEFAULT_AGENT["id"] for a in agents):
-        ok("Default 'Milli AI' agent already exists -- skipping.")
+        ok("Default 'Synapse AI' agent already exists -- skipping.")
         return
 
     # Prepend so it appears first
     agents.insert(0, DEFAULT_AGENT)
     with open(agents_file, "w", encoding="utf-8") as f:
         json.dump(agents, f, indent=4)
-    ok("Created default 'Milli AI' agent with access to all tools.")
+    ok("Created default 'Synapse AI' agent with access to all tools.")
 
 # ---------------------------------------------------------------------------
 # Install helpers
 # ---------------------------------------------------------------------------
-def _register_milli_pth(venv_dir, root_dir):
+def _register_synapse_pth(venv_dir, root_dir):
     """Add root_dir to the venv's site-packages via a .pth file.
 
-    This makes 'import milli' work from the venv without running
+    This makes 'import synapse' work from the venv without running
     pip install -e (which triggers hatchling's build hook and requires bash).
     """
     import glob as _glob
@@ -1643,7 +1643,7 @@ def _register_milli_pth(venv_dir, root_dir):
             return
         site_pkgs = candidates[-1]
     os.makedirs(site_pkgs, exist_ok=True)
-    pth = os.path.join(site_pkgs, "milli-source.pth")
+    pth = os.path.join(site_pkgs, "synapse-source.pth")
     with open(pth, "w", encoding="utf-8") as f:
         f.write(str(root_dir) + "\n")
 
@@ -1700,9 +1700,9 @@ def install_backend(coding_enabled, messaging_enabled=False):
         else:
             warn(f"requirements-messaging.txt not found at {messaging_req}")
 
-    info("Registering Milli package...")
-    _register_milli_pth(VENV_DIR, ROOT_DIR)
-    ok("Milli package registered.")
+    info("Registering Synapse package...")
+    _register_synapse_pth(VENV_DIR, ROOT_DIR)
+    ok("Synapse package registered.")
 
 def install_frontend():
     step("Installing Frontend Dependencies")
@@ -1764,9 +1764,9 @@ def ask_ports(cfg):
     cfg["backend_port"] = backend_port
     cfg["frontend_port"] = frontend_port
 
-    _update_env_file("MILLI_BACKEND_PORT", str(backend_port))
+    _update_env_file("SYNAPSE_BACKEND_PORT", str(backend_port))
     _update_env_file("NEXT_PUBLIC_BACKEND_PORT", str(backend_port))
-    _update_env_file("MILLI_FRONTEND_PORT", str(frontend_port))
+    _update_env_file("SYNAPSE_FRONTEND_PORT", str(frontend_port))
     ok(f"Ports saved to .env -- backend={backend_port}, frontend={frontend_port}.")
 
 
@@ -1776,10 +1776,10 @@ def ask_ports(cfg):
 def start_backend(backend_port: int = DEFAULT_BACKEND_PORT):
     step("Starting Backend Server")
     env = os.environ.copy()
-    env["MILLI_BACKEND_PORT"] = str(backend_port)
-    # Always pass MILLI_DATA_DIR as an absolute path so the backend subprocess
+    env["SYNAPSE_BACKEND_PORT"] = str(backend_port)
+    # Always pass SYNAPSE_DATA_DIR as an absolute path so the backend subprocess
     # resolves it correctly regardless of its working directory.
-    env["MILLI_DATA_DIR"] = os.path.abspath(DATA_DIR)
+    env["SYNAPSE_DATA_DIR"] = os.path.abspath(DATA_DIR)
     return subprocess.Popen([PYTHON_EXE, "main.py"], cwd=BACKEND_DIR, env=env)
 
 def _find_npm_cmd_win():
@@ -1797,7 +1797,7 @@ def _find_npm_cmd_win():
 def start_frontend(frontend_port: int = DEFAULT_FRONTEND_PORT, backend_port: int = DEFAULT_BACKEND_PORT):
     step("Starting Frontend Server")
     env = os.environ.copy()
-    env["MILLI_FRONTEND_PORT"] = str(frontend_port)
+    env["SYNAPSE_FRONTEND_PORT"] = str(frontend_port)
     env["BACKEND_URL"] = f"http://127.0.0.1:{backend_port}"
     if IS_WIN:
         npm = _find_npm_cmd_win()
@@ -1838,33 +1838,33 @@ def add_to_bashrc():
     bin_dir = os.path.join(ROOT_DIR, "bin")
     
     # Ensure the binary has full execution permissions (chmod 755)
-    milli_bin = os.path.join(bin_dir, "milli")
-    if os.path.exists(milli_bin):
-        os.chmod(milli_bin, 0o755)
-        ok(f"Set execution permissions for {milli_bin}")
+    synapse_bin = os.path.join(bin_dir, "synapse")
+    if os.path.exists(synapse_bin):
+        os.chmod(synapse_bin, 0o755)
+        ok(f"Set execution permissions for {synapse_bin}")
     # Also chmod any .sh wrapper if present
-    milli_sh = os.path.join(bin_dir, "milli.sh")
-    if os.path.exists(milli_sh):
-        os.chmod(milli_sh, 0o755)
+    synapse_sh = os.path.join(bin_dir, "synapse.sh")
+    if os.path.exists(synapse_sh):
+        os.chmod(synapse_sh, 0o755)
 
-    export_line = f"\nexport PATH=\"{bin_dir}:$PATH\"  # Milli AI"
+    export_line = f"\nexport PATH=\"{bin_dir}:$PATH\"  # Synapse AI"
     
     if not os.path.exists(bashrc):
         with open(bashrc, "w", encoding="utf-8") as f:
             f.write(export_line + "\n")
-        ok(f"Created {bashrc} with Milli PATH")
+        ok(f"Created {bashrc} with Synapse PATH")
         return True
     
     with open(bashrc, "r", encoding="utf-8") as f:
         content = f.read()
     
     if bin_dir in content:
-        ok("Milli already in PATH (bashrc)")
+        ok("Synapse already in PATH (bashrc)")
         return True
 
     with open(bashrc, "a", encoding="utf-8") as f:
         f.write(export_line + "\n")
-    ok(f"Added Milli to PATH (bashrc)")
+    ok(f"Added Synapse to PATH (bashrc)")
     return True
 
 def add_to_zshrc():
@@ -1874,18 +1874,18 @@ def add_to_zshrc():
         return False
     
     bin_dir = os.path.join(ROOT_DIR, "bin")
-    export_line = f"\nexport PATH=\"{bin_dir}:$PATH\"  # Milli AI"
+    export_line = f"\nexport PATH=\"{bin_dir}:$PATH\"  # Synapse AI"
     
     with open(zshrc, "r", encoding="utf-8") as f:
         content = f.read()
     
     if bin_dir in content:
-        ok("Milli already in PATH (zshrc)")
+        ok("Synapse already in PATH (zshrc)")
         return True
     
     with open(zshrc, "a", encoding="utf-8") as f:
         f.write(export_line + "\n")
-    ok(f"Added Milli to PATH (zshrc)")
+    ok(f"Added Synapse to PATH (zshrc)")
     return True
 
 def _add_to_windows_path(bin_dir):
@@ -1909,25 +1909,25 @@ def _add_to_windows_path(bin_dir):
             subprocess.run(["setx", "PATH", new_path], capture_output=True)
             ok(f"Added {bin_dir} to user PATH (setx). Changes take effect in new terminals.")
         else:
-            ok("Milli bin directory is already in user PATH.")
+            ok("Synapse bin directory is already in user PATH.")
     except Exception as e:
         warn(f"setx PATH update failed: {e}")
 
-    # 2. Also prepend to the current process PATH so milli.bat is findable now
+    # 2. Also prepend to the current process PATH so synapse.bat is findable now
     if bin_dir.lower() not in os.environ.get("PATH", "").lower():
         os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
 
 
 def setup_path():
     """Setup PATH for the current platform"""
-    step("Setting up Milli command")
+    step("Setting up Synapse command")
     bin_dir = os.path.join(ROOT_DIR, "bin")
 
     if IS_WIN:
-        info("Registering 'milli' command in PATH...")
+        info("Registering 'synapse' command in PATH...")
         _add_to_windows_path(bin_dir)
-        info("In your CURRENT session you can already run: milli start")
-        info(f"(If 'milli' is not found, open a new terminal -- setx takes effect then.)")
+        info("In your CURRENT session you can already run: synapse start")
+        info(f"(If 'synapse' is not found, open a new terminal -- setx takes effect then.)")
         ok("Windows PATH setup complete.")
     else:
         # Unix: Try to add to .bashrc / .zshrc
@@ -1935,72 +1935,72 @@ def setup_path():
         add_to_bashrc()
         add_to_zshrc()
 
-        # Update PATH in the current process so milli is immediately usable
+        # Update PATH in the current process so synapse is immediately usable
         os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
         info("")
-        info("To use 'milli' in your CURRENT terminal, run:")
+        info("To use 'synapse' in your CURRENT terminal, run:")
         info(f"  export PATH=\"{bin_dir}:$PATH\"")
         info("(Already saved to ~/.bashrc / ~/.zshrc for future sessions.)")
         ok("PATH setup complete.")
 
 def show_restart_instructions():
-    """Show instructions for restarting Milli"""
-    step("To Start Milli Again Later")
+    """Show instructions for restarting Synapse"""
+    step("To Start Synapse Again Later")
 
     if IS_WIN:
         info("Open a new terminal (cmd or PowerShell) and run:")
-        info("  milli start")
+        info("  synapse start")
         info("")
-        info("If 'milli' is not recognised yet (PATH not refreshed), use:")
-        info(f"  python -m milli start")
-        info(f"  (run this from inside the milli-ai folder)")
+        info("If 'synapse' is not recognised yet (PATH not refreshed), use:")
+        info(f"  python -m synapse start")
+        info(f"  (run this from inside the synapse-ai folder)")
         info("")
         info("Other useful commands:")
-        info("  milli stop      # Stop running services")
-        info("  milli status    # Check service status")
-        info("  milli restart   # Restart services")
-        info("  milli upgrade   # Upgrade to the latest version")
+        info("  synapse stop      # Stop running services")
+        info("  synapse status    # Check service status")
+        info("  synapse restart   # Restart services")
+        info("  synapse upgrade   # Upgrade to the latest version")
         info("")
         info("Installed via pip or npm instead?")
-        info("  pip upgrade:  pip install --upgrade milli-orch-ai")
-        info("  npm upgrade:  npm update -g milli-orch-ai")
+        info("  pip upgrade:  pip install --upgrade synapse-orch-ai")
+        info("  npm upgrade:  npm update -g synapse-orch-ai")
     else:
         info("Simply run:")
-        info(f"  milli start")
+        info(f"  synapse start")
         info("")
         info("If the command is not found, either:")
         info(f"  1. Run: source ~/.bashrc   (or source ~/.zshrc)")
         info(f"  2. Or open a new terminal")
-        info(f"  3. Or use: python -m milli start")
+        info(f"  3. Or use: python -m synapse start")
         info("")
         info("Other useful commands:")
-        info(f"  milli stop      # Stop running services")
-        info(f"  milli status    # Check service status")
-        info(f"  milli restart   # Restart services")
-        info(f"  milli upgrade   # Upgrade to the latest version")
+        info(f"  synapse stop      # Stop running services")
+        info(f"  synapse status    # Check service status")
+        info(f"  synapse restart   # Restart services")
+        info(f"  synapse upgrade   # Upgrade to the latest version")
         info("")
         info("Installed via pip or npm instead?")
-        info(f"  pip upgrade:  pip install --upgrade milli-orch-ai")
-        info(f"  npm upgrade:  npm update -g milli-orch-ai")
+        info(f"  pip upgrade:  pip install --upgrade synapse-orch-ai")
+        info(f"  npm upgrade:  npm update -g synapse-orch-ai")
 
 
 # ---------------------------------------------------------------------------
 # Install Location & Already-Installed Detection
 # ---------------------------------------------------------------------------
 def _get_default_install_dir():
-    """Return the OS-standard directory where Milli AI should be installed."""
+    """Return the OS-standard directory where Synapse AI should be installed."""
     if IS_WIN:
         local_app = os.environ.get(
             "LOCALAPPDATA",
             os.path.join(os.path.expanduser("~"), "AppData", "Local"),
         )
-        return os.path.join(local_app, "Programs", "MilliAI")
+        return os.path.join(local_app, "Programs", "SynapseAI")
     elif sys.platform == "darwin":
         return os.path.join(
-            os.path.expanduser("~"), "Library", "Application Support", "MilliAI"
+            os.path.expanduser("~"), "Library", "Application Support", "SynapseAI"
         )
     else:  # Linux
-        return os.path.join(os.path.expanduser("~"), ".local", "share", "milli-ai")
+        return os.path.join(os.path.expanduser("~"), ".local", "share", "synapse-ai")
 
 
 def _is_already_installed():
@@ -2033,25 +2033,25 @@ def _write_install_marker():
 
 
 def _stop_running_services(install_dir):
-    """Stop any running Milli services before rebuilding."""
+    """Stop any running Synapse services before rebuilding."""
     step("Stopping Running Services")
-    milli_bin = os.path.join(install_dir, "bin", "milli" + (".bat" if IS_WIN else ""))
+    synapse_bin = os.path.join(install_dir, "bin", "synapse" + (".bat" if IS_WIN else ""))
     stopped = False
 
-    # Try calling `milli stop` via the installed bin script
-    if os.path.exists(milli_bin):
+    # Try calling `synapse stop` via the installed bin script
+    if os.path.exists(synapse_bin):
         try:
             result = subprocess.run(
-                [milli_bin, "stop"],
+                [synapse_bin, "stop"],
                 capture_output=True, text=True, timeout=30,
             )
             if result.returncode == 0:
                 ok("Services stopped.")
                 stopped = True
             else:
-                warn("milli stop returned non-zero; trying PID files...")
+                warn("synapse stop returned non-zero; trying PID files...")
         except Exception as e:
-            warn(f"Could not invoke milli stop: {e}")
+            warn(f"Could not invoke synapse stop: {e}")
 
     # Fallback: kill PIDs recorded in run/ directory
     if not stopped:
@@ -2139,8 +2139,8 @@ def _rebuild_backend(install_dir):
         else:
             warn(f"requirements-messaging.txt not found at {messaging_req}")
 
-    info("Registering Milli package...")
-    _register_milli_pth(venv_dir, install_dir)
+    info("Registering Synapse package...")
+    _register_synapse_pth(venv_dir, install_dir)
     ok("Backend dependencies updated.")
 
 
@@ -2169,7 +2169,7 @@ def _rebuild_frontend(install_dir):
 def _handle_already_installed(install_dir):
     """Stop services, pull latest, rebuild, show start instructions."""
     print(f"\n{C.BOLD}{C.GREEN}{'=' * 54}{C.RESET}")
-    print(f"{C.BOLD}{C.GREEN}   Milli AI is already installed!{C.RESET}")
+    print(f"{C.BOLD}{C.GREEN}   Synapse AI is already installed!{C.RESET}")
     print(f"{C.BOLD}{C.GREEN}{'=' * 54}{C.RESET}")
     print(f"\n   Location: {_c(C.CYAN, install_dir)}\n")
 
@@ -2228,15 +2228,15 @@ def _handle_already_installed(install_dir):
     # 5. Show instructions
     # ------------------------------------------------------------------
     print()
-    print(f"{C.BOLD}{C.GREEN}Milli AI has been updated and rebuilt!{C.RESET}")
+    print(f"{C.BOLD}{C.GREEN}Synapse AI has been updated and rebuilt!{C.RESET}")
     print()
-    print(f"{C.BOLD}To start Milli:{C.RESET}")
-    print(f"   {_c(C.CYAN, 'milli start')}")
+    print(f"{C.BOLD}To start Synapse:{C.RESET}")
+    print(f"   {_c(C.CYAN, 'synapse start')}")
     print()
     print(f"Other commands:")
-    print(f"   milli stop      -- stop running services")
-    print(f"   milli status    -- check service status")
-    print(f"   milli restart   -- restart services")
+    print(f"   synapse stop      -- stop running services")
+    print(f"   synapse status    -- check service status")
+    print(f"   synapse restart   -- restart services")
     print()
     sys.exit(0)
 
@@ -2245,20 +2245,20 @@ def _handle_already_installed(install_dir):
 # Startup on Boot
 # ---------------------------------------------------------------------------
 def _register_startup_win():
-    """Register milli start --detach in HKCU Run (no admin required)."""
+    """Register synapse start --detach in HKCU Run (no admin required)."""
     try:
         import winreg  # type: ignore  # stdlib on Windows
-        milli_bat = os.path.join(ROOT_DIR, "bin", "milli.bat")
-        command = f'"{milli_bat}" start --detach'
+        synapse_bat = os.path.join(ROOT_DIR, "bin", "synapse.bat")
+        command = f'"{synapse_bat}" start --detach'
         key = winreg.OpenKey(
             winreg.HKEY_CURRENT_USER,
             r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
             0,
             winreg.KEY_SET_VALUE,
         )
-        winreg.SetValueEx(key, "MilliAI", 0, winreg.REG_SZ, command)
+        winreg.SetValueEx(key, "SynapseAI", 0, winreg.REG_SZ, command)
         winreg.CloseKey(key)
-        ok("Milli registered to start on login (Registry > Run).")
+        ok("Synapse registered to start on login (Registry > Run).")
     except Exception as e:
         warn(f"Could not register startup: {e}")
         info("You can add it manually: search 'Task Scheduler' in the Start menu.")
@@ -2275,8 +2275,8 @@ def _unregister_startup_win():
             winreg.KEY_SET_VALUE,
         )
         try:
-            winreg.DeleteValue(key, "MilliAI")
-            ok("Removed Milli from startup (Registry > Run).")
+            winreg.DeleteValue(key, "SynapseAI")
+            ok("Removed Synapse from startup (Registry > Run).")
         except FileNotFoundError:
             pass  # not registered -- fine
         winreg.CloseKey(key)
@@ -2294,7 +2294,7 @@ def _is_startup_registered_win():
             winreg.KEY_READ,
         )
         try:
-            winreg.QueryValueEx(key, "MilliAI")
+            winreg.QueryValueEx(key, "SynapseAI")
             winreg.CloseKey(key)
             return True
         except FileNotFoundError:
@@ -2305,32 +2305,32 @@ def _is_startup_registered_win():
 
 
 def _register_startup_mac():
-    """Install a LaunchAgent plist so Milli starts on login."""
+    """Install a LaunchAgent plist so Synapse starts on login."""
     launch_agents = os.path.join(os.path.expanduser("~"), "Library", "LaunchAgents")
     os.makedirs(launch_agents, exist_ok=True)
-    plist_path = os.path.join(launch_agents, "com.milli-ai.server.plist")
-    milli_bin = os.path.join(ROOT_DIR, "bin", "milli")
+    plist_path = os.path.join(launch_agents, "com.synapse-ai.server.plist")
+    synapse_bin = os.path.join(ROOT_DIR, "bin", "synapse")
     plist = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.milli-ai.server</string>
+    <string>com.synapse-ai.server</string>
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
         <string>-lc</string>
-        <string>"{milli_bin}" start --detach</string>
+        <string>"{synapse_bin}" start --detach</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <false/>
     <key>StandardOutPath</key>
-    <string>/tmp/milli-ai.log</string>
+    <string>/tmp/synapse-ai.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/milli-ai-error.log</string>
+    <string>/tmp/synapse-ai-error.log</string>
 </dict>
 </plist>
 """
@@ -2338,7 +2338,7 @@ def _register_startup_mac():
         with open(plist_path, "w", encoding="utf-8") as f:
             f.write(plist)
         subprocess.run(["launchctl", "load", plist_path], check=False, capture_output=True)
-        ok(f"LaunchAgent installed -- Milli will start on login.")
+        ok(f"LaunchAgent installed -- Synapse will start on login.")
         info(f"  Plist: {plist_path}")
     except Exception as e:
         warn(f"Could not install LaunchAgent: {e}")
@@ -2346,32 +2346,32 @@ def _register_startup_mac():
 
 def _unregister_startup_mac():
     plist_path = os.path.join(
-        os.path.expanduser("~"), "Library", "LaunchAgents", "com.milli-ai.server.plist"
+        os.path.expanduser("~"), "Library", "LaunchAgents", "com.synapse-ai.server.plist"
     )
     if os.path.exists(plist_path):
         try:
             subprocess.run(["launchctl", "unload", plist_path], check=False, capture_output=True)
             os.remove(plist_path)
-            ok("Removed Milli LaunchAgent.")
+            ok("Removed Synapse LaunchAgent.")
         except Exception as e:
             warn(f"Could not remove LaunchAgent: {e}")
 
 
 def _is_startup_registered_mac():
     plist_path = os.path.join(
-        os.path.expanduser("~"), "Library", "LaunchAgents", "com.milli-ai.server.plist"
+        os.path.expanduser("~"), "Library", "LaunchAgents", "com.synapse-ai.server.plist"
     )
     return os.path.exists(plist_path)
 
 
 def _register_startup_linux():
-    """Install a systemd user service so Milli starts on login."""
+    """Install a systemd user service so Synapse starts on login."""
     service_dir = os.path.join(
         os.path.expanduser("~"), ".config", "systemd", "user"
     )
     os.makedirs(service_dir, exist_ok=True)
-    service_path = os.path.join(service_dir, "milli-ai.service")
-    milli_bin = os.path.join(ROOT_DIR, "bin", "milli")
+    service_path = os.path.join(service_dir, "synapse-ai.service")
+    synapse_bin = os.path.join(ROOT_DIR, "bin", "synapse")
     bin_dir = os.path.join(ROOT_DIR, "bin")
 
     # Try to find node bin dir for the service PATH
@@ -2381,13 +2381,13 @@ def _register_startup_linux():
         node_dir = os.path.dirname(node_exe) + ":"
 
     service_content = f"""[Unit]
-Description=Milli AI Server
+Description=Synapse AI Server
 After=network.target
 
 [Service]
 Type=forking
-ExecStart={milli_bin} start --detach
-ExecStop={milli_bin} stop
+ExecStart={synapse_bin} start --detach
+ExecStop={synapse_bin} stop
 WorkingDirectory={ROOT_DIR}
 Environment="PATH={bin_dir}:{node_dir}/usr/local/bin:/usr/bin:/bin"
 Restart=on-failure
@@ -2400,38 +2400,38 @@ WantedBy=default.target
         with open(service_path, "w", encoding="utf-8") as f:
             f.write(service_content)
         subprocess.run(["systemctl", "--user", "daemon-reload"], check=False, capture_output=True)
-        subprocess.run(["systemctl", "--user", "enable", "milli-ai.service"], check=False, capture_output=True)
-        ok("systemd user service installed -- Milli will start on login.")
+        subprocess.run(["systemctl", "--user", "enable", "synapse-ai.service"], check=False, capture_output=True)
+        ok("systemd user service installed -- Synapse will start on login.")
         info(f"  Service: {service_path}")
-        info("  To start now (without rebooting): systemctl --user start milli-ai")
+        info("  To start now (without rebooting): systemctl --user start synapse-ai")
     except Exception as e:
         warn(f"Could not install systemd service: {e}")
 
 
 def _unregister_startup_linux():
     service_path = os.path.join(
-        os.path.expanduser("~"), ".config", "systemd", "user", "milli-ai.service"
+        os.path.expanduser("~"), ".config", "systemd", "user", "synapse-ai.service"
     )
     if os.path.exists(service_path):
         try:
-            subprocess.run(["systemctl", "--user", "disable", "milli-ai.service"],
+            subprocess.run(["systemctl", "--user", "disable", "synapse-ai.service"],
                            check=False, capture_output=True)
             os.remove(service_path)
             subprocess.run(["systemctl", "--user", "daemon-reload"], check=False, capture_output=True)
-            ok("Removed Milli systemd user service.")
+            ok("Removed Synapse systemd user service.")
         except Exception as e:
             warn(f"Could not remove systemd service: {e}")
 
 
 def _is_startup_registered_linux():
     service_path = os.path.join(
-        os.path.expanduser("~"), ".config", "systemd", "user", "milli-ai.service"
+        os.path.expanduser("~"), ".config", "systemd", "user", "synapse-ai.service"
     )
     return os.path.exists(service_path)
 
 
 def ask_startup_on_boot(cfg):
-    """Ask the user whether Milli should start automatically on login/boot."""
+    """Ask the user whether Synapse should start automatically on login/boot."""
     step("Start on Login")
 
     # Check current registration state
@@ -2443,7 +2443,7 @@ def ask_startup_on_boot(cfg):
         currently_registered = _is_startup_registered_linux()
 
     if currently_registered:
-        info("Milli is currently set to start automatically on login.")
+        info("Synapse is currently set to start automatically on login.")
         keep = ask_yn("Keep this setting?", default="y")
         if keep:
             ok("Auto-start on login kept.")
@@ -2461,9 +2461,9 @@ def ask_startup_on_boot(cfg):
             ok("Auto-start on login disabled.")
             return
 
-    info("Milli can start automatically in the background when you log in.")
+    info("Synapse can start automatically in the background when you log in.")
     info("It runs silently -- just open your browser to http://localhost:3000.")
-    enable = ask_yn("Start Milli automatically on login?", default="n")
+    enable = ask_yn("Start Synapse automatically on login?", default="n")
     cfg["start_on_boot"] = enable
 
     if not enable:
@@ -2495,7 +2495,7 @@ def main():
 
     if upgrade_mode:
         print(f"\n{C.BOLD}{C.CYAN}{'=' * 50}{C.RESET}")
-        print(f"{C.BOLD}{C.CYAN}   Milli AI -- Rebuild{C.RESET}")
+        print(f"{C.BOLD}{C.CYAN}   Synapse AI -- Rebuild{C.RESET}")
         print(f"{C.BOLD}{C.CYAN}{'=' * 50}{C.RESET}\n")
         check_python()
         check_npm()
@@ -2525,7 +2525,7 @@ def main():
         sys.exit(0)
 
     print(f"\n{C.BOLD}{C.CYAN}{'=' * 50}{C.RESET}")
-    print(f"{C.BOLD}{C.CYAN}   Milli AI -- Setup Wizard{C.RESET}")
+    print(f"{C.BOLD}{C.CYAN}   Synapse AI -- Setup Wizard{C.RESET}")
     print(f"{C.BOLD}{C.CYAN}{'=' * 50}{C.RESET}\n")
 
     # ------------------------------------------------------------------
@@ -2578,12 +2578,12 @@ def main():
     save_settings(cfg)  # persist start_on_boot preference
 
     print()
-    start_now = ask_yn("Start Milli now?", default="y")
+    start_now = ask_yn("Start Synapse now?", default="y")
 
     if not start_now:
         print()
         show_restart_instructions()
-        print(f"\n{C.GREEN}Setup complete! Milli is ready to use.{C.RESET}\n")
+        print(f"\n{C.GREEN}Setup complete! Synapse is ready to use.{C.RESET}\n")
         sys.exit(0)
 
     _backend_port = cfg.get("backend_port", DEFAULT_BACKEND_PORT)

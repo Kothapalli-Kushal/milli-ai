@@ -1,9 +1,9 @@
 ﻿"""
-Tuner for the Milli Self-Improvement subsystem (Checkpoint 3).
+Tuner for the Synapse Self-Improvement subsystem (Checkpoint 3).
 
 Turns an insights report + the target object's current JSON config into a
 `ProposedDiff` — a reviewable, evidence-linked set of field edits — using
-Milli's own LLM dispatch (`core.llm_providers.generate_response`). No
+Synapse's own LLM dispatch (`core.llm_providers.generate_response`). No
 direct provider SDK calls, ever.
 
 Guardrails (CLAUDE.md §0.5, enforced here as the FIRST of two boundaries;
@@ -20,7 +20,7 @@ Guardrails (CLAUDE.md §0.5, enforced here as the FIRST of two boundaries;
 Attribution: the tuner system prompt below is derived from the SKILL.md of
 the `recursive-improve` project, licensed under the Apache License,
 Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0). Modifications:
-adapted to Milli's agent/orchestration config schema, field allow-list,
+adapted to Synapse's agent/orchestration config schema, field allow-list,
 and ProposedDiff output contract. Provided on an "AS IS" BASIS, WITHOUT
 WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 --------------------------------------------------------------------------
@@ -219,7 +219,7 @@ TUNER_SYSTEM_PROMPT = """You are a configuration tuner for AI agents and orchest
 You analyze behavioral insights extracted from execution traces and propose minimal, \
 targeted edits to the target's JSON configuration that address the observed problems.
 
-Principles (from recursive-improve, adapted to Milli):
+Principles (from recursive-improve, adapted to Synapse):
 - Ground every proposed edit in specific evidence from the insights. Never invent problems.
 - Prefer the smallest change that plausibly fixes the highest-severity finding.
 - Improve instructions (system prompts / prompt templates) before changing structure.

@@ -15,7 +15,7 @@ Format on disk:
 
 The store is intentionally simple — no LRU, no compression, no Redis. The
 hot path is one open()+json.load() per lookup; for the dataset sizes we care
-about (tens of MB per namespace) this is well under a millisecond.
+about (tens of MB per namespace) this is well under a synapsesecond.
 """
 import hashlib
 import json

@@ -106,7 +106,7 @@ const SETUP_GUIDES: Record<Platform, { title: string; steps: string[] }> = {
             'Go to portal.azure.com → Create a resource → Azure Bot',
             'Set the Messaging endpoint to: https://<your-ngrok-url>/api/messaging/teams/webhook/<channel-id>',
             'For local dev, run: ngrok http 8765  and use the Forwarding URL',
-            'Note: only the Synapse backend needs the public URL — your frontend is unaffected',
+            'Note: only the Milli backend needs the public URL — your frontend is unaffected',
             'In the bot Configuration, copy the Microsoft App ID',
             'In Certificates & Secrets, create a new client secret and copy it',
             'Add the Teams channel in the bot\'s Channels tab',
@@ -121,7 +121,7 @@ const SETUP_GUIDES: Record<Platform, { title: string; steps: string[] }> = {
             'Set your Verify Token (any string), subscribe to the messages webhook field',
             'Copy the Phone Number ID and generate a temporary/permanent Access Token',
             '--- OR ---',
-            'UNOFFICIAL PATH: No business account needed. Synapse will open WhatsApp Web in a browser window and you scan the QR code to authenticate. This may violate WhatsApp\'s Terms of Service.',
+            'UNOFFICIAL PATH: No business account needed. Milli will open WhatsApp Web in a browser window and you scan the QR code to authenticate. This may violate WhatsApp\'s Terms of Service.',
         ],
     },
 };
@@ -539,7 +539,7 @@ export const MessagingTab = () => {
                                             </div>
                                             {waRiskAck && (
                                                 <div className="p-3 bg-zinc-950 border border-zinc-700 text-[10px] text-zinc-400 space-y-1">
-                                                    <p>After saving & connecting, Synapse will open WhatsApp Web in a Chromium browser window.</p>
+                                                    <p>After saving & connecting, Milli will open WhatsApp Web in a Chromium browser window.</p>
                                                     <p>Scan the QR code shown in the browser to authenticate. The session is saved and persists across restarts.</p>
                                                 </div>
                                             )}

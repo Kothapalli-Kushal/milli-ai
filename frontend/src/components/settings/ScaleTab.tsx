@@ -287,13 +287,13 @@ const ScaleDocsDrawer = ({ open, onClose }: { open: boolean; onClose: () => void
                     <div className="flex items-start gap-3 px-4 py-3 bg-violet-950/30 border border-violet-800/40 text-xs text-violet-300">
                         <Zap className="w-3.5 h-3.5 text-violet-400 shrink-0 mt-0.5" />
                         <span>
-                            Scale mode turns Synapse into a <strong className="text-violet-200">distributed job queue</strong>. Your main Synapse instance manages definitions and the UI — workers pull jobs from Redis and execute them in parallel. All you need to get started is a <strong className="text-violet-200">Redis server</strong>.
+                            Scale mode turns Milli into a <strong className="text-violet-200">distributed job queue</strong>. Your main Milli instance manages definitions and the UI — workers pull jobs from Redis and execute them in parallel. All you need to get started is a <strong className="text-violet-200">Redis server</strong>.
                         </span>
                     </div>
 
                     <DocSection title="Architecture Overview" defaultOpen>
                         <p className="text-xs text-zinc-500 leading-relaxed">
-                            In scale mode, Synapse splits into three roles. You always run exactly one <strong className="text-zinc-300">main instance</strong> (the combined image you already have). Workers and API servers are optional replicas.
+                            In scale mode, Milli splits into three roles. You always run exactly one <strong className="text-zinc-300">main instance</strong> (the combined image you already have). Workers and API servers are optional replicas.
                         </p>
                         <div className="space-y-2 text-xs font-mono">
                             <div className="border border-zinc-800 p-3 bg-zinc-900/50">

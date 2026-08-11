@@ -1,4 +1,4 @@
-﻿name: Publish Milli
+﻿﻿name: Publish Synapse
 
 on:
   push:
@@ -68,7 +68,7 @@ jobs:
           name: frontend-builds
           include-hidden-files: true
           path: |
-            milli/_frontend
+            synapse/_frontend
             frontend-build
 
   publish-python:
@@ -98,8 +98,8 @@ jobs:
           python -m venv /tmp/verify
           /tmp/verify/bin/pip install --upgrade pip
           /tmp/verify/bin/pip install --no-deps dist/*.whl
-          /tmp/verify/bin/milli --help
-          /tmp/verify/bin/python -c "import milli.cli; assert callable(milli.cli.main)"
+          /tmp/verify/bin/synapse --help
+          /tmp/verify/bin/python -c "import synapse.cli; assert callable(synapse.cli.main)"
 
       - name: Publish to PyPI
         run: |
@@ -128,11 +128,11 @@ jobs:
       - name: Verify tarball hygiene before publish
         run: |
           npm pack
-          tgz=$(ls milli-orch-ai-*.tgz)
+          tgz=$(ls synapse-orch-ai-*.tgz)
           if tar tzf "$tgz" | grep -E '__pycache__|\.pyc$'; then
             echo "::error::npm tarball ships Python bytecode"; exit 1
           fi
-          tar tzf "$tgz" | grep -qx package/bin/milli.js || { echo "::error::missing launcher"; exit 1; }
+          tar tzf "$tgz" | grep -qx package/bin/synapse.js || { echo "::error::missing launcher"; exit 1; }
 
       - name: Publish to npm
         run: npm publish --access public
@@ -169,8 +169,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/milli-ai:${{ steps.version.outputs.VERSION }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/milli-ai:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/synapse-ai:${{ steps.version.outputs.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/synapse-ai:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -182,8 +182,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/milli-ai-worker:${{ steps.version.outputs.VERSION }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/milli-ai-worker:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/synapse-ai-worker:${{ steps.version.outputs.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/synapse-ai-worker:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -195,7 +195,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/milli-ai-api-server:${{ steps.version.outputs.VERSION }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/milli-ai-api-server:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/synapse-ai-api-server:${{ steps.version.outputs.VERSION }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/synapse-ai-api-server:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

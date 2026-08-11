@@ -1,4 +1,4 @@
-﻿# General
+﻿﻿# General
 .DS_Store
 .vscode/
 .idea/
@@ -46,7 +46,7 @@ dist/
 *.whl
 *.tar.gz
 *.tgz
-milli/_frontend/
+synapse/_frontend/
 frontend-build/
 node_modules/
 

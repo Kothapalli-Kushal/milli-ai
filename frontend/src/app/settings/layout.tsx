@@ -109,7 +109,7 @@ export default function SettingsLayout({
 
                     <div className="p-4 border-t border-zinc-800 hidden md:block">
                         <div className="text-[10px] text-zinc-500 font-mono text-center">
-                            Synapse v1
+                            Milli v1
                         </div>
                     </div>
                 </div>

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter, JetBrains_Mono, IBM_Plex_Sans } from "next/font/google";
 // @ts-ignore: CSS module declarations are not present in this repo setup
 import "./globals.css";

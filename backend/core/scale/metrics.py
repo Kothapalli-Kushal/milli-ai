@@ -15,35 +15,35 @@ try:
 
     # --- Counters ---
     runs_enqueued = Counter(
-        "milli_runs_enqueued_total",
+        "synapse_runs_enqueued_total",
         "Total orchestration runs enqueued",
         ["tenant_id", "orch_id"],
     )
     runs_completed = Counter(
-        "milli_runs_completed_total",
+        "synapse_runs_completed_total",
         "Total orchestration runs completed",
         ["tenant_id", "status"],
     )
     chat_jobs_total = Counter(
-        "milli_chat_jobs_total",
+        "synapse_chat_jobs_total",
         "Total agent chat jobs processed",
         ["tenant_id", "status"],
     )
     webhook_deliveries = Counter(
-        "milli_webhook_deliveries_total",
+        "synapse_webhook_deliveries_total",
         "Total webhook delivery attempts",
         ["status"],  # "success" | "failed"
     )
 
     # --- Histograms ---
     run_duration = Histogram(
-        "milli_run_duration_seconds",
+        "synapse_run_duration_seconds",
         "Orchestration run duration in seconds",
         ["tenant_id"],
         buckets=[1, 5, 15, 30, 60, 120, 300, 600, 1800, 3600],
     )
     step_duration = Histogram(
-        "milli_step_duration_seconds",
+        "synapse_step_duration_seconds",
         "Individual step duration in seconds",
         ["step_type"],
         buckets=[0.1, 0.5, 1, 5, 15, 30, 60, 120],
@@ -51,16 +51,16 @@ try:
 
     # --- Gauges ---
     queue_depth = Gauge(
-        "milli_queue_depth",
+        "synapse_queue_depth",
         "Current ARQ queue depth",
         ["queue_name"],
     )
     active_workers = Gauge(
-        "milli_active_workers",
+        "synapse_active_workers",
         "Number of online workers",
     )
     active_runs = Gauge(
-        "milli_active_runs",
+        "synapse_active_runs",
         "Number of currently running orchestrations",
     )
 
