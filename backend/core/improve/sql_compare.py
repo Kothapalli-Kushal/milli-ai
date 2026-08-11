@@ -54,7 +54,7 @@ def is_read_only(sql: str) -> bool:
     """True when `sql` is a read-only statement.
 
     The primary authority is `tools/sql_agent.py::_is_write_query`, the guard
-    Milli already ships and already trusts — CP6 does not write a second one.
+    Synapse already ships and already trusts — CP6 does not write a second one.
     sqlglot, when installed, adds a second opinion that also catches writes
     hidden behind CTEs (`WITH x AS (...) DELETE ...`) and stacked statements,
     which a first-keyword check cannot see. Either side saying "write" refuses.
@@ -234,7 +234,7 @@ class ExecResult:
 
 
 class SqlExecutor:
-    """Executes read-only SQL against an EXISTING Milli SQL connection.
+    """Executes read-only SQL against an EXISTING Synapse SQL connection.
 
     CP6 introduces no connection manager, no credential storage, and no DB
     config of its own (checklist 6.40) — `connection_id` is a `db_configs.json`

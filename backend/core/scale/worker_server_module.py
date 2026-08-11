@@ -1,4 +1,4 @@
-﻿"""
+﻿﻿"""
 Minimal stub of core.server's server_module interface for use inside worker processes.
 Workers don't have a running FastAPI app or interactive MCP session setup,
 so this builds a lightweight equivalent that satisfies OrchestrationEngine.
@@ -191,8 +191,8 @@ def _get_native_mcp_servers(tools_dir: Path, backend_root: Path) -> dict:
     for name, args in WORKER_NPX_TOOLS.items():
         servers[name] = StdioServerParameters(command=_NPX_CMD, args=args)
 
-    # Filesystem MCP (Node.js) — point to MILLI_DATA_DIR
-    data_dir = os.getenv("MILLI_DATA_DIR", str(backend_root / "data"))
+    # Filesystem MCP (Node.js) — point to SYNAPSE_DATA_DIR
+    data_dir = os.getenv("SYNAPSE_DATA_DIR", str(backend_root / "data"))
     worker_fs_paths = os.getenv("WORKER_FILESYSTEM_PATHS", data_dir)
     filesystem_paths = [p.strip() for p in worker_fs_paths.split(",") if p.strip()]
     if filesystem_paths:

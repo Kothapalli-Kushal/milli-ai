@@ -1,5 +1,5 @@
 ﻿"""
-Rubric registry for the Milli Self-Improvement subsystem (Checkpoint 6, §6.4).
+Rubric registry for the Synapse Self-Improvement subsystem (Checkpoint 6, §6.4).
 
 Rubrics are STANDALONE, REUSABLE, IMMUTABLE-PER-VERSION objects, consistent
 with §0.6.1's decision for benchmarks. A rubric is generic ("does it avoid
@@ -23,7 +23,7 @@ Storage (§0.6.5 — per-user auth-scoped):
     improve/<user_id>/rubrics/index.json              # id -> latest version
 
 REGISTRY UNIFICATION: this module is the single authoritative Rubric registry
-for Milli. The Training-tab concept of a flat `data/rubrics.json` is
+for Synapse. The Training-tab concept of a flat `data/rubrics.json` is
 SUPERSEDED — do not create it. A shared flat file cannot satisfy §0.6.5's
 per-user auth-scoping constraint. The public API below (`get_rubric`,
 `list_rubrics`, `save_rubric`, `resolve_version`) is what the Training tab

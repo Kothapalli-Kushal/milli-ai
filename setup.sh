@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+﻿﻿#!/bin/bash
 
 set -e
 
@@ -269,7 +269,7 @@ check_git() {
 main() {
     echo ""
     echo "========================================================"
-    echo "   Milli AI — Repository Setup"
+    echo "   Synapse AI — Repository Setup"
     echo "========================================================"
     echo ""
     
@@ -280,9 +280,9 @@ main() {
     
     # OS-specific installation directory
     if [[ "$OS" == "macos" ]]; then
-        INSTALL_DIR="$HOME/Library/Application Support/MilliAI"
+        INSTALL_DIR="$HOME/Library/Application Support/SynapseAI"
     else
-        INSTALL_DIR="$HOME/.local/share/MilliAI"
+        INSTALL_DIR="$HOME/.local/share/SynapseAI"
     fi
     MARKER_FILE="$INSTALL_DIR/.installed"
 
@@ -290,44 +290,44 @@ main() {
     if [ -f "$MARKER_FILE" ]; then
         echo ""
         echo "======================================================"
-        echo -e "\033[92m   Milli AI is already installed!\033[0m"
+        echo -e "\033[92m   Synapse AI is already installed!\033[0m"
         echo "======================================================"
         echo ""
         echo -e "   \033[96mLocation: $INSTALL_DIR\033[0m"
         echo ""
 
-        # Delegate to 'milli upgrade' — it handles stop, download, rebuild
+        # Delegate to 'synapse upgrade' — it handles stop, download, rebuild
         export PATH="$INSTALL_DIR/bin:$PATH"
         echo ""
-        echo -e "\033[96m==> Running milli upgrade...\033[0m"
-        "$INSTALL_DIR/bin/milli" upgrade
+        echo -e "\033[96m==> Running synapse upgrade...\033[0m"
+        "$INSTALL_DIR/bin/synapse" upgrade
 
         echo ""
         echo "======================================================"
-        echo -e "\033[92m   Milli AI has been updated!\033[0m"
+        echo -e "\033[92m   Synapse AI has been updated!\033[0m"
         echo "======================================================"
         echo ""
-        echo "To start Milli:"
-        echo -e "  \033[96mmilli start\033[0m"
+        echo "To start Synapse:"
+        echo -e "  \033[96msynapse start\033[0m"
         echo ""
         echo "Other commands:"
-        echo "  milli stop      -- stop running services"
-        echo "  milli status    -- check service status"
-        echo "  milli restart   -- restart services"
+        echo "  synapse stop      -- stop running services"
+        echo "  synapse status    -- check service status"
+        echo "  synapse restart   -- restart services"
         echo ""
 
         # Auto-activate PATH in this terminal without requiring the user to source ~/.bashrc
         if [ "$_SOURCED" = false ] && [ -t 1 ] && [ -f "$HOME/.bashrc" ]; then
-            echo -e "\033[96m==> Activating 'milli' command in this terminal...\033[0m"
+            echo -e "\033[96m==> Activating 'synapse' command in this terminal...\033[0m"
             exec bash --rcfile "$HOME/.bashrc" -i
         fi
         exit 0
     fi
 
     # Download latest release from GitHub (no git required)
-    GITHUB_API="https://api.github.com/repos/synapseorch-ai/milli-ai/releases/latest"
+    GITHUB_API="https://api.github.com/repos/synapseorch-ai/synapse-ai/releases/latest"
     echo ""
-    echo -e "\033[96mFetching latest Milli AI release...\033[0m"
+    echo -e "\033[96mFetching latest Synapse AI release...\033[0m"
     if command -v curl &> /dev/null; then
         TARBALL_URL=$(curl -s "$GITHUB_API" | grep '"tarball_url"' | head -1 | cut -d'"' -f4)
     elif command -v wget &> /dev/null; then
@@ -351,7 +351,7 @@ main() {
             echo "git not found and GitHub download failed. Please install git or check your internet connection."
             exit 1
         fi
-        git clone https://github.com/synapseorch-ai/milli-ai.git "$INSTALL_DIR"
+        git clone https://github.com/synapseorch-ai/synapse-ai.git "$INSTALL_DIR"
     fi
     
     cd "$INSTALL_DIR"
@@ -369,9 +369,9 @@ main() {
         if [ -f "$profile" ]; then
             if ! grep -q "$BIN_DIR" "$profile"; then
                 echo "" >> "$profile"
-                echo "# Milli AI" >> "$profile"
+                echo "# Synapse AI" >> "$profile"
                 echo "export PATH=\"$BIN_DIR:\$PATH\"" >> "$profile"
-                echo -e "\033[92m[OK] Added Milli to profile ($profile)\033[0m"
+                echo -e "\033[92m[OK] Added Synapse to profile ($profile)\033[0m"
             fi
         fi
     done
@@ -381,20 +381,20 @@ main() {
 
     echo ""
     echo "========================================================"
-    echo -e "\033[92m   Milli AI setup complete!\033[0m"
+    echo -e "\033[92m   Synapse AI setup complete!\033[0m"
     echo -e "   Installed at:  \033[96m$INSTALL_DIR\033[0m"
     echo ""
-    echo -e "   To start Milli:"
-    echo -e "     \033[96mmilli start\033[0m"
+    echo -e "   To start Synapse:"
+    echo -e "     \033[96msynapse start\033[0m"
     echo ""
     echo -e "   To upgrade in the future:"
-    echo -e "     \033[96mmilli upgrade\033[0m"
+    echo -e "     \033[96msynapse upgrade\033[0m"
     echo "========================================================"
 
     # Auto-activate PATH in this terminal without requiring the user to source ~/.bashrc
     if [ "$_SOURCED" = false ] && [ -t 1 ] && [ -f "$HOME/.bashrc" ]; then
         echo ""
-        echo -e "\033[96m==> Activating 'milli' command in this terminal...\033[0m"
+        echo -e "\033[96m==> Activating 'synapse' command in this terminal...\033[0m"
         exec bash --rcfile "$HOME/.bashrc" -i
     fi
 }

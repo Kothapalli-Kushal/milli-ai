@@ -26,8 +26,23 @@ LEGACY_BUILDER_AGENT_IDS: set[str] = {
 
 
 def _load_json(path: str) -> Any:
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    # Accept BOM-encoded JSON files so seeding remains robust across editors
+    # on Windows (including repeated BOMs in legacy files).
+    with open(path, "rb") as f:
+        raw = f.read()
+
+    decoded = None
+    for encoding in ("utf-8-sig", "utf-16", "utf-16-le", "utf-16-be"):
+        try:
+            decoded = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+
+    if decoded is None:
+        decoded = raw.decode("utf-8", errors="replace")
+
+    return json.loads(decoded.lstrip("\ufeff"))
 
 
 def _expand_cheatsheet(text: str) -> str:

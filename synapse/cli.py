@@ -1,5 +1,5 @@
-﻿"""
-Milli CLI - starts the backend and frontend, then opens the browser.
+﻿﻿"""
+Synapse CLI - starts the backend and frontend, then opens the browser.
 """
 import os
 import sys
@@ -35,19 +35,19 @@ def _rmtree(path):
 
 
 def _fix_bin_permissions():
-    """Ensure bin/milli has execute permissions (chmod 755) on Unix."""
+    """Ensure bin/synapse has execute permissions (chmod 755) on Unix."""
     if IS_WIN:
         return
-    milli_bin = ROOT_DIR / "bin" / "milli"
-    if milli_bin.exists():
+    synapse_bin = ROOT_DIR / "bin" / "synapse"
+    if synapse_bin.exists():
         try:
-            milli_bin.chmod(0o755)
+            synapse_bin.chmod(0o755)
         except PermissionError as e:
-            print(f"  Warning: could not set permissions on {milli_bin}: {e}")
-            print(f"  Fix manually: chmod 755 {milli_bin}")
+            print(f"  Warning: could not set permissions on {synapse_bin}: {e}")
+            print(f"  Fix manually: chmod 755 {synapse_bin}")
 
 PACKAGE_DIR = Path(__file__).resolve().parent
-# When installed as a package, backend is one level up from milli/
+# When installed as a package, backend is one level up from synapse/
 BACKEND_DIR = PACKAGE_DIR.parent / "backend"
 FRONTEND_DIR = PACKAGE_DIR.parent / "frontend"
 ROOT_DIR = PACKAGE_DIR.parent
@@ -96,7 +96,7 @@ def _system_python() -> str:
 
 # ---------------------------------------------------------------------------
 # Load .env from the project root BEFORE reading port defaults so that values
-# set by `milli setup` (or hand-edited .env) are honoured without the user
+# set by `synapse setup` (or hand-edited .env) are honoured without the user
 # having to export them manually in every shell session.
 # ---------------------------------------------------------------------------
 _ENV_FILE = ROOT_DIR / ".env"
@@ -122,18 +122,18 @@ def _load_dotenv(path: Path):
 
 _load_dotenv(_ENV_FILE)
 
-DEFAULT_DATA_DIR = Path.home() / ".milli" / "data"
+DEFAULT_DATA_DIR = Path.home() / ".synapse" / "data"
 # Always resolve to absolute path so the value is correct regardless of CWD.
-# When MILLI_DATA_DIR is a relative path (e.g. "data" in .env), resolve it
-# relative to the project root rather than wherever `milli` was invoked from.
-_raw_data_dir = os.getenv("MILLI_DATA_DIR", str(DEFAULT_DATA_DIR))
+# When SYNAPSE_DATA_DIR is a relative path (e.g. "data" in .env), resolve it
+# relative to the project root rather than wherever `synapse` was invoked from.
+_raw_data_dir = os.getenv("SYNAPSE_DATA_DIR", str(DEFAULT_DATA_DIR))
 if not os.path.isabs(_raw_data_dir):
     DATA_DIR = (ROOT_DIR / _raw_data_dir).resolve()
 else:
     DATA_DIR = Path(_raw_data_dir).resolve()
 
-DEFAULT_BACKEND_PORT = int(os.getenv("MILLI_BACKEND_PORT", "8765"))
-DEFAULT_FRONTEND_PORT = int(os.getenv("MILLI_FRONTEND_PORT", "3000"))
+DEFAULT_BACKEND_PORT = int(os.getenv("SYNAPSE_BACKEND_PORT", "8765"))
+DEFAULT_FRONTEND_PORT = int(os.getenv("SYNAPSE_FRONTEND_PORT", "3000"))
 
 # Runtime ports (may be overridden by CLI args -- module-level aliases kept for
 # backwards compatibility; actual values are resolved in _start_command)
@@ -339,12 +339,12 @@ def _ensure_playwright_browsers():
 
 def start_backend(detach: bool = False, port: int | None = None, profile: bool = False):
     env = os.environ.copy()
-    env["MILLI_DATA_DIR"] = str(DATA_DIR)
+    env["SYNAPSE_DATA_DIR"] = str(DATA_DIR)
     env["PYTHONPATH"] = str(BACKEND_DIR) + os.pathsep + env.get("PYTHONPATH", "")
     if port is not None:
-        env["MILLI_BACKEND_PORT"] = str(port)
+        env["SYNAPSE_BACKEND_PORT"] = str(port)
     if profile:
-        env["MILLI_PROFILING"] = "true"
+        env["SYNAPSE_PROFILING"] = "true"
     kwargs = {}
     if detach:
         if os.name == "posix":
@@ -360,7 +360,7 @@ def start_backend(detach: bool = False, port: int | None = None, profile: bool =
 
 
 def _sync_bundled_frontend(verbose: bool = True) -> bool:
-    """Copy the latest standalone build from frontend/.next/standalone into milli/_frontend/.
+    """Copy the latest standalone build from frontend/.next/standalone into synapse/_frontend/.
 
     Returns True if a sync was performed, False if skipped (no source or no mismatch).
     """
@@ -368,7 +368,7 @@ def _sync_bundled_frontend(verbose: bool = True) -> bool:
     if not standalone_src.exists():
         if verbose:
             print(f"  Warning: standalone build not found at {standalone_src}")
-            print("  milli/_frontend/ was NOT updated. Try running scripts/build_frontend.sh manually.")
+            print("  synapse/_frontend/ was NOT updated. Try running scripts/build_frontend.sh manually.")
         return False
     _rmtree(_BUNDLED_FRONTEND)
     _BUNDLED_FRONTEND.mkdir(parents=True, exist_ok=True)
@@ -390,8 +390,8 @@ def start_frontend(detach: bool = False, port: int | None = None, backend_port: 
     env = os.environ.copy()
     env["BACKEND_URL"] = f"http://127.0.0.1:{_backend_port}"
     env["NEXT_PUBLIC_BACKEND_PORT"] = str(_backend_port)
-    env["MILLI_FRONTEND_PORT"] = str(_frontend_port)
-    env["MILLI_BACKEND_PORT"] = str(_backend_port)
+    env["SYNAPSE_FRONTEND_PORT"] = str(_frontend_port)
+    env["SYNAPSE_BACKEND_PORT"] = str(_backend_port)
     kwargs = {}
     if detach:
         if os.name == "posix":
@@ -399,9 +399,9 @@ def start_frontend(detach: bool = False, port: int | None = None, backend_port: 
         else:
             kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
 
-    # Pip-installed package: frontend is pre-built standalone at milli/_frontend/
+    # Pip-installed package: frontend is pre-built standalone at synapse/_frontend/
     if _BUNDLED_FRONTEND.exists():
-        # Auto-sync if the source has a newer build (e.g. after milli upgrade pulled new code).
+        # Auto-sync if the source has a newer build (e.g. after synapse upgrade pulled new code).
         standalone_src = FRONTEND_DIR / ".next" / "standalone"
         if standalone_src.exists():
             src_id_file = standalone_src / ".next" / "BUILD_ID"
@@ -409,14 +409,14 @@ def start_frontend(detach: bool = False, port: int | None = None, backend_port: 
             src_id = src_id_file.read_text(encoding="utf-8").strip() if src_id_file.exists() else None
             bundled_id = bundled_id_file.read_text(encoding="utf-8").strip() if bundled_id_file.exists() else None
             if src_id and src_id != bundled_id:
-                print("  Syncing updated frontend build into milli/_frontend/...")
+                print("  Syncing updated frontend build into synapse/_frontend/...")
                 _sync_bundled_frontend(verbose=False)
                 print("  Frontend sync complete.")
 
         server_js = _BUNDLED_FRONTEND / "server.js"
         if not server_js.exists():
             print(f"Error: bundled frontend server not found at {server_js}")
-            print("Try reinstalling: pip install --upgrade milli-ai")
+            print("Try reinstalling: pip install --upgrade synapse-ai")
             sys.exit(1)
         node = shutil.which("node")
         if not node:
@@ -456,7 +456,7 @@ def wait_for_url(url: str, name: str, timeout: int = 300) -> bool:
             print()
             print(f"  Timeout waiting for {name} at {url}")
             print(f"  Check that nothing else is using port {port},")
-            print(f"  or try 'milli stop' then 'milli start'.")
+            print(f"  or try 'synapse stop' then 'synapse start'.")
             return False
         try:
             urllib.request.urlopen(url, timeout=3)
@@ -573,11 +573,11 @@ def _ensure_coding_deps() -> None:
     """
     Ensure cocoindex and psycopg are installed and up-to-date in the backend venv.
 
-    Called at every `milli start` so the deps are self-healing:
+    Called at every `synapse start` so the deps are self-healing:
     - Fresh installs that skipped the coding-agent step get them auto-installed.
     - Old installs with an outdated cocoindex (missing .typing) get upgraded.
     - Installs where the user toggled Code Indexing ON after initial setup work
-      without needing a manual 'milli upgrade'.
+      without needing a manual 'synapse upgrade'.
     """
     venv_python = BACKEND_DIR / "venv" / ("Scripts/python.exe" if IS_WIN else "bin/python")
     if not venv_python.exists():
@@ -611,13 +611,13 @@ def _ensure_coding_deps() -> None:
 
 
 def _ensure_internal_token():
-    """Ensure MILLI_INTERNAL_TOKEN exists in .env. Generate if missing.
+    """Ensure SYNAPSE_INTERNAL_TOKEN exists in .env. Generate if missing.
 
     This token secures the backend's internal /api/* routes so only the
     frontend can access them. External API access uses separate API keys.
     """
     env_file = ROOT_DIR / ".env"
-    token_var = "MILLI_INTERNAL_TOKEN"
+    token_var = "SYNAPSE_INTERNAL_TOKEN"
 
     # Check if already in environment (e.g. from .env loaded earlier)
     if os.environ.get(token_var):
@@ -653,9 +653,9 @@ def _ensure_internal_token():
 
 
 def _ensure_jwt_secret():
-    """Ensure MILLI_JWT_SECRET exists in .env. Generate if missing."""
+    """Ensure SYNAPSE_JWT_SECRET exists in .env. Generate if missing."""
     env_file = ROOT_DIR / ".env"
-    var = "MILLI_JWT_SECRET"
+    var = "SYNAPSE_JWT_SECRET"
 
     if os.environ.get(var):
         return
@@ -685,7 +685,7 @@ def _ensure_jwt_secret():
 
 
 def _reset_password_command():
-    """Reset the Milli UI login password via the CLI."""
+    """Reset the Synapse UI login password via the CLI."""
     import getpass
     import json as _json
 
@@ -695,7 +695,7 @@ def _reset_password_command():
 
     settings_file = DATA_DIR / "settings.json"
     if not settings_file.exists():
-        print("  Error: settings.json not found. Start Milli first to initialise it.")
+        print("  Error: settings.json not found. Start Synapse first to initialise it.")
         sys.exit(1)
 
     try:
@@ -774,7 +774,7 @@ def _api_keys_command(action: str, name: str = "", key_id: str = ""):
         from core.api_keys import list_api_keys
         keys = list_api_keys()
         if not keys:
-            print("  No API keys found. Generate one with: milli api-keys generate \"My App\"")
+            print("  No API keys found. Generate one with: synapse api-keys generate \"My App\"")
             return
         print(f"\n  {'PREFIX':<18} {'NAME':<25} {'CREATED':<22} {'LAST USED':<22} {'ACTIVE'}")
         print(f"  {'-' * 18} {'-' * 25} {'-' * 22} {'-' * 22} {'-' * 6}")
@@ -787,7 +787,7 @@ def _api_keys_command(action: str, name: str = "", key_id: str = ""):
 
     elif action == "revoke":
         if not key_id:
-            print("  Error: key ID required. Get IDs with: milli api-keys list")
+            print("  Error: key ID required. Get IDs with: synapse api-keys list")
             sys.exit(1)
         from core.api_keys import delete_api_key
         if delete_api_key(key_id):
@@ -798,7 +798,7 @@ def _api_keys_command(action: str, name: str = "", key_id: str = ""):
 
     else:
         print(f"  Unknown action: {action}")
-        print(f"  Usage: milli api-keys [generate|list|revoke]")
+        print(f"  Usage: synapse api-keys [generate|list|revoke]")
         sys.exit(1)
 
 
@@ -817,10 +817,10 @@ def _start_command(
     _settings_file = DATA_DIR / "settings.json"
     if not _settings_file.exists():
         try:
-            from milli import setup_wizard
+            from synapse import setup_wizard
             setup_wizard.run()
         except Exception as e:
-            print(f"Note: setup wizard error ({e}). Run 'milli setup' to configure.")
+            print(f"Note: setup wizard error ({e}). Run 'synapse setup' to configure.")
 
     # Resolve effective ports: CLI arg > settings.json > env var > default
     _saved_backend_port: int | None = None
@@ -848,11 +848,11 @@ def _start_command(
         fp = _read_pidfile(FRONTEND_PID_FILE)
         if bp and _is_running(bp):
             print(f"Backend already running (pid {bp}).")
-            print("Run 'milli stop' first, or add --detach to run alongside.")
+            print("Run 'synapse stop' first, or add --detach to run alongside.")
             sys.exit(1)
         if fp and _is_running(fp):
             print(f"Frontend already running (pid {fp}).")
-            print("Run 'milli stop' first, or add --detach to run alongside.")
+            print("Run 'synapse stop' first, or add --detach to run alongside.")
             sys.exit(1)
 
     print(f"Starting backend on port {effective_backend_port}...")
@@ -901,18 +901,18 @@ def _start_command(
     if not no_browser and not detach:
         threading.Thread(target=open_browser, args=(url,), daemon=True).start()
 
-    print(f"\nMilli is running at {url}")
+    print(f"\nSynapse is running at {url}")
     if detach:
         print(f"  Backend pid:  {_read_pidfile(BACKEND_PID_FILE)}  (port {effective_backend_port})")
         print(f"  Frontend pid: {_read_pidfile(FRONTEND_PID_FILE)}  (port {effective_frontend_port})")
         print()
-        print("Run 'milli stop' to stop  |  'milli status' to check")
+        print("Run 'synapse stop' to stop  |  'synapse status' to check")
         return
 
     print("Press Ctrl+C to stop.\n")
 
     def _shutdown(sig, frame):
-        print("\nStopping Milli...")
+        print("\nStopping Synapse...")
         # Kill full process trees -- on Windows terminate() leaves node children alive
         _kill_proc_tree(frontend_proc)
         _kill_proc_tree(backend_proc)
@@ -990,7 +990,7 @@ def _parse_version(v: str) -> tuple:
         return (0,)
 
 
-def _register_milli_pth(venv_dir: str, root_dir: str) -> None:
+def _register_synapse_pth(venv_dir: str, root_dir: str) -> None:
     """Add root_dir to the venv's site-packages via a .pth file.
 
     Equivalent to pip install -e but skips the build hook entirely —
@@ -1008,7 +1008,7 @@ def _register_milli_pth(venv_dir: str, root_dir: str) -> None:
             return
         site_pkgs = candidates[-1]
     os.makedirs(site_pkgs, exist_ok=True)
-    pth = os.path.join(site_pkgs, "milli-source.pth")
+    pth = os.path.join(site_pkgs, "synapse-source.pth")
     with open(pth, "w", encoding="utf-8") as f:
         f.write(str(root_dir) + "\n")
 
@@ -1017,9 +1017,9 @@ def _get_latest_github_release() -> "tuple[str, str] | tuple[None, None]":
     """Return (tag_name, tarball_url) for the latest GitHub release, or (None, None) on failure."""
     import urllib.request as _req
     import json as _json
-    url = "https://api.github.com/repos/synapseorch-ai/milli-ai/releases/latest"
+    url = "https://api.github.com/repos/synapseorch-ai/synapse-ai/releases/latest"
     try:
-        req = _req.Request(url, headers={"User-Agent": "milli-upgrade/1.0"})
+        req = _req.Request(url, headers={"User-Agent": "synapse-upgrade/1.0"})
         with _req.urlopen(req, timeout=15) as resp:
             data = _json.loads(resp.read())
         return data.get("tag_name", ""), data.get("tarball_url", "")
@@ -1043,14 +1043,14 @@ def _download_and_apply_release(tarball_url: str) -> bool:
         "backend/.playwright-mcp",
         "backend/node_modules",
         "frontend/node_modules",
-        # Note: frontend/.next and milli/_frontend are intentionally NOT skipped —
+        # Note: frontend/.next and synapse/_frontend are intentionally NOT skipped —
         # they get rebuilt by npm build + _sync_bundled_frontend() during upgrade.
     }
 
     with tempfile.TemporaryDirectory() as tmp:
         tar_path = os.path.join(tmp, "release.tar.gz")
         print("  Downloading...", end="", flush=True)
-        req = _req.Request(tarball_url, headers={"User-Agent": "milli-upgrade/1.0"})
+        req = _req.Request(tarball_url, headers={"User-Agent": "synapse-upgrade/1.0"})
         try:
             with _req.urlopen(req, timeout=120) as resp, open(tar_path, "wb") as f:
                 shutil.copyfileobj(resp, f)
@@ -1107,12 +1107,12 @@ def _download_and_apply_release(tarball_url: str) -> bool:
 
 
 def _upgrade_command():
-    """Upgrade Milli AI to the latest version.
+    """Upgrade Synapse AI to the latest version.
 
-    - pip-installed  → pip install --upgrade milli-orch-ai
+    - pip-installed  → pip install --upgrade synapse-orch-ai
     - source / editable install → download latest GitHub release + rebuild venv + rebuild frontend
     """
-    print("\n=== Milli AI -- Upgrade ===")
+    print("\n=== Synapse AI -- Upgrade ===")
 
     # Detect whether we're running from a pip-installed wheel or a source tree.
     # When installed from PyPI, ROOT_DIR is inside site-packages/.
@@ -1122,17 +1122,17 @@ def _upgrade_command():
         # ── pip-installed path ────────────────────────────────────────────────
         print("\nUpgrading via pip...")
         result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "--upgrade", "milli-orch-ai"],
+            [sys.executable, "-m", "pip", "install", "--upgrade", "synapse-orch-ai"],
             # Show live output so the user can see progress
             stdout=None, stderr=None,
         )
         if result.returncode != 0:
             print("\n  Upgrade failed.")
-            print("  Try manually: pip install --upgrade milli-orch-ai")
+            print("  Try manually: pip install --upgrade synapse-orch-ai")
             sys.exit(result.returncode)
 
         print("\n=== Upgrade complete! ===")
-        print("Run 'milli start' to launch the updated Milli.")
+        print("Run 'synapse start' to launch the updated Synapse.")
         return
 
     # ── source / editable install path ───────────────────────────────────────
@@ -1146,9 +1146,9 @@ def _upgrade_command():
 
     # When we successfully apply a new release we re-exec this script using the
     # freshly-downloaded cli.py so that any changes to the upgrade logic itself
-    # take effect immediately — no "run milli upgrade twice" required.
+    # take effect immediately — no "run synapse upgrade twice" required.
     # The re-exec'd process receives this flag and skips straight to the rebuild.
-    _skip_download = os.environ.get("MILLI_UPGRADE_SKIP_DOWNLOAD") == "1"
+    _skip_download = os.environ.get("SYNAPSE_UPGRADE_SKIP_DOWNLOAD") == "1"
 
     if not _skip_download:
         # 1. Stop running services first
@@ -1167,13 +1167,13 @@ def _upgrade_command():
                     print(f"  Source updated to {latest_tag}.")
                     # Re-exec with the newly-downloaded cli.py so the rest of
                     # the upgrade (venv rebuild, npm build, etc.) runs with the
-                    # new code.  The environment — including MILLI_INTERNAL_TOKEN
+                    # new code.  The environment — including SYNAPSE_INTERNAL_TOKEN
                     # set above — is inherited by the child process.
-                    new_cli = ROOT_DIR / "milli" / "cli.py"
+                    new_cli = ROOT_DIR / "synapse" / "cli.py"
                     if new_cli.exists():
                         print("  Restarting upgrade with updated CLI...")
                         env = os.environ.copy()
-                        env["MILLI_UPGRADE_SKIP_DOWNLOAD"] = "1"
+                        env["SYNAPSE_UPGRADE_SKIP_DOWNLOAD"] = "1"
                         result = subprocess.run(
                             [sys.executable, str(new_cli), "upgrade"],
                             env=env,
@@ -1262,14 +1262,14 @@ def _upgrade_command():
         else:
             print(f"  Warning: {messaging_req} not found -- skipping.")
 
-    # Register milli package via .pth file — no build hook, no bash required
-    print("  Registering Milli package...")
-    _register_milli_pth(str(venv_dir), str(ROOT_DIR))
+    # Register synapse package via .pth file — no build hook, no bash required
+    print("  Registering Synapse package...")
+    _register_synapse_pth(str(venv_dir), str(ROOT_DIR))
     print("  Backend rebuild complete.")
 
     # 4. Rebuild frontend
     # Ensure the internal token is in os.environ so the build subprocess
-    # inherits it — Next.js bundles process.env.MILLI_INTERNAL_TOKEN into
+    # inherits it — Next.js bundles process.env.SYNAPSE_INTERNAL_TOKEN into
     # the Edge Middleware at build time.
     _ensure_internal_token()
 
@@ -1290,50 +1290,50 @@ def _upgrade_command():
 
     # Sync new standalone build into _BUNDLED_FRONTEND if this is a traditionally-installed instance.
     if _BUNDLED_FRONTEND.exists():
-        print("  Updating bundled frontend (milli/_frontend/)...")
+        print("  Updating bundled frontend (synapse/_frontend/)...")
         if _sync_bundled_frontend(verbose=True):
             print("  Bundled frontend updated.")
 
     print("  Frontend rebuild complete.")
 
-    # 5. Re-apply execute permissions on the milli bin script
+    # 5. Re-apply execute permissions on the synapse bin script
     # (git pull can reset the execute bit, especially on WSL/Linux)
     _fix_bin_permissions()
 
     print("\n=== Upgrade complete! ===")
-    print("Run 'milli start' to launch the updated Milli.")
+    print("Run 'synapse start' to launch the updated Synapse.")
     if not IS_WIN:
         bin_dir = str(ROOT_DIR / "bin")
-        print(f"\nIf 'milli' is not found in your terminal, run:")
+        print(f"\nIf 'synapse' is not found in your terminal, run:")
         print(f"  export PATH=\"{bin_dir}:$PATH\"")
         print("(Already saved to ~/.bashrc / ~/.zshrc for new terminals.)")
 
 
-def _get_milli_install_dir() -> Path | None:
-    """Return the platform-specific MilliAI install directory written by setup.sh / setup.ps1."""
+def _get_synapse_install_dir() -> Path | None:
+    """Return the platform-specific SynapseAI install directory written by setup.sh / setup.ps1."""
     if IS_WIN:
         local_app_data = os.environ.get("LOCALAPPDATA", "")
         if local_app_data:
-            return Path(local_app_data) / "Programs" / "MilliAI"
+            return Path(local_app_data) / "Programs" / "SynapseAI"
         return None
     elif sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "MilliAI"
+        return Path.home() / "Library" / "Application Support" / "SynapseAI"
     else:  # Linux
-        return Path.home() / ".local" / "share" / "MilliAI"
+        return Path.home() / ".local" / "share" / "SynapseAI"
 
 
 def _uninstall_command(keep_data: bool = False):
-    """Stop services and remove all Milli AI files."""
-    print("\n=== Milli AI -- Uninstall ===")
+    """Stop services and remove all Synapse AI files."""
+    print("\n=== Synapse AI -- Uninstall ===")
     print()
 
     # Resolve the platform install directory up-front so later steps can reference it.
-    platform_install = _get_milli_install_dir()
+    platform_install = _get_synapse_install_dir()
 
     # Confirm
     try:
         answer = input(
-            "This will PERMANENTLY remove Milli AI and all its files.\n"
+            "This will PERMANENTLY remove Synapse AI and all its files.\n"
             "Type 'yes' to confirm: "
         ).strip().lower()
     except (EOFError, KeyboardInterrupt):
@@ -1363,7 +1363,7 @@ def _uninstall_command(keep_data: bool = False):
                 0, winreg.KEY_SET_VALUE,
             )
             try:
-                winreg.DeleteValue(key, "MilliAI")
+                winreg.DeleteValue(key, "SynapseAI")
                 print("  Removed Windows startup entry.")
             except FileNotFoundError:
                 pass
@@ -1371,7 +1371,7 @@ def _uninstall_command(keep_data: bool = False):
         except Exception:
             pass
     elif _platform == "darwin":
-        plist = Path.home() / "Library" / "LaunchAgents" / "com.milli-ai.server.plist"
+        plist = Path.home() / "Library" / "LaunchAgents" / "com.synapse-ai.server.plist"
         if plist.exists():
             try:
                 subprocess.run(["launchctl", "unload", str(plist)], check=False, capture_output=True)
@@ -1380,10 +1380,10 @@ def _uninstall_command(keep_data: bool = False):
             except Exception:
                 pass
     else:  # Linux
-        service = Path.home() / ".config" / "systemd" / "user" / "milli-ai.service"
+        service = Path.home() / ".config" / "systemd" / "user" / "synapse-ai.service"
         if service.exists():
             try:
-                subprocess.run(["systemctl", "--user", "disable", "milli-ai.service"],
+                subprocess.run(["systemctl", "--user", "disable", "synapse-ai.service"],
                                check=False, capture_output=True)
                 service.unlink()
                 subprocess.run(["systemctl", "--user", "daemon-reload"], check=False, capture_output=True)
@@ -1398,19 +1398,19 @@ def _uninstall_command(keep_data: bool = False):
             print(f"  Removed data directory: {DATA_DIR}")
         except Exception as e:
             print(f"  Warning: could not remove data dir {DATA_DIR}: {e}")
-    # Also remove ~/.milli parent directory (config files, etc.)
+    # Also remove ~/.synapse parent directory (config files, etc.)
     if not keep_data:
-        milli_home = Path.home() / ".milli"
-        if milli_home.exists():
+        synapse_home = Path.home() / ".synapse"
+        if synapse_home.exists():
             try:
-                _rmtree(milli_home)
-                print(f"  Removed Milli home: {milli_home}")
+                _rmtree(synapse_home)
+                print(f"  Removed Synapse home: {synapse_home}")
             except Exception as e:
-                print(f"  Warning: could not fully remove {milli_home}: {e}")
+                print(f"  Warning: could not fully remove {synapse_home}: {e}")
 
     # 4. Remove the installation directory/directories
     # Collect unique dirs: the running ROOT_DIR plus the platform standard install location
-    # (e.g. ~/.local/share/MilliAI on Linux, %LOCALAPPDATA%\Programs\MilliAI on Windows).
+    # (e.g. ~/.local/share/SynapseAI on Linux, %LOCALAPPDATA%\Programs\SynapseAI on Windows).
     # Skip ROOT_DIR when pip-installed: it resolves to site-packages/, which must not be deleted.
     _is_pip_install = any(p in ("site-packages", "dist-packages") for p in ROOT_DIR.parts)
     if _is_pip_install:
@@ -1438,9 +1438,9 @@ def _uninstall_command(keep_data: bool = False):
             print(f"  Warning: could not fully remove {_install_dir}: {e}")
             print("  You may need to delete it manually.")
 
-    # 5. Remove the pip-installed `milli` console script
+    # 5. Remove the pip-installed `synapse` console script
     print("\nUninstalling Python package...")
-    _pip_names = ["milli-orch-ai", "milli-ai", "milli"]
+    _pip_names = ["synapse-orch-ai", "synapse-ai", "synapse"]
     try:
         _removed = False
         for _pkg in _pip_names:
@@ -1457,21 +1457,21 @@ def _uninstall_command(keep_data: bool = False):
     except Exception as e:
         print(f"  Warning: pip uninstall failed: {e}")
 
-    # Fallback: remove the milli executable directly if it still exists on PATH
-    milli_exe = shutil.which("milli")
-    if milli_exe:
+    # Fallback: remove the synapse executable directly if it still exists on PATH
+    synapse_exe = shutil.which("synapse")
+    if synapse_exe:
         try:
-            Path(milli_exe).unlink(missing_ok=True)
-            print(f"  Removed executable: {milli_exe}")
+            Path(synapse_exe).unlink(missing_ok=True)
+            print(f"  Removed executable: {synapse_exe}")
         except PermissionError:
-            print(f"  Warning: no permission to remove {milli_exe} -- delete it manually.")
+            print(f"  Warning: no permission to remove {synapse_exe} -- delete it manually.")
         except Exception as e:
-            print(f"  Warning: could not remove {milli_exe}: {e}")
+            print(f"  Warning: could not remove {synapse_exe}: {e}")
 
     # Windows: also scrub leftover files from the Python Scripts directory
     if IS_WIN:
         scripts_dir = Path(sys.executable).parent / "Scripts"
-        for name in ("milli.exe", "milli-script.py"):
+        for name in ("synapse.exe", "synapse-script.py"):
             candidate = scripts_dir / name
             if candidate.exists():
                 try:
@@ -1518,7 +1518,7 @@ def _uninstall_command(keep_data: bool = False):
                 continue
             try:
                 lines = ps_profile.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
-                new_lines = [l for l in lines if "MilliAI" not in l and "Milli AI" not in l]
+                new_lines = [l for l in lines if "SynapseAI" not in l and "Synapse AI" not in l]
                 if len(new_lines) != len(lines):
                     ps_profile.write_text("".join(new_lines), encoding="utf-8")
                     print(f"  Cleaned PATH entry from PowerShell profile: {ps_profile}")
@@ -1535,7 +1535,7 @@ def _uninstall_command(keep_data: bool = False):
                 try:
                     lines = rc_file.read_text(encoding="utf-8").splitlines(keepends=True)
                     new_lines = [l for l in lines
-                                 if "MilliAI" not in l and "Milli AI" not in l
+                                 if "SynapseAI" not in l and "Synapse AI" not in l
                                  and not any(d in l for d in _bin_dirs_lower)]
                     if len(new_lines) != len(lines):
                         rc_file.write_text("".join(new_lines), encoding="utf-8")
@@ -1543,11 +1543,11 @@ def _uninstall_command(keep_data: bool = False):
                 except Exception:
                     pass
 
-    print("\n=== Milli AI has been uninstalled. Goodbye! ===")
+    print("\n=== Synapse AI has been uninstalled. Goodbye! ===")
 
 
 def _profile_command(action: str, output: str | None = None, limit: int = 20, duration: int = 30):
-    backend_port = int(os.getenv("MILLI_BACKEND_PORT", str(DEFAULT_BACKEND_PORT)))
+    backend_port = int(os.getenv("SYNAPSE_BACKEND_PORT", str(DEFAULT_BACKEND_PORT)))
     base_url = f"http://127.0.0.1:{backend_port}/api/profiling"
 
     def _api(method: str, path: str, params: str = "") -> dict | str | None:
@@ -1568,7 +1568,7 @@ def _profile_command(action: str, output: str | None = None, limit: int = 20, du
             return None
         except Exception as e:
             print(f"Could not reach backend at {url}: {e}")
-            print("Make sure Milli is running (milli start).")
+            print("Make sure Synapse is running (synapse start).")
             return None
 
     if action == "stats":
@@ -1627,7 +1627,7 @@ def _profile_command(action: str, output: str | None = None, limit: int = 20, du
     elif action == "spy":
         pid = _read_pidfile(BACKEND_PID_FILE)
         if not pid:
-            print("Backend PID not found. Start with: milli start --detach")
+            print("Backend PID not found. Start with: synapse start --detach")
             return
         if not _is_running(pid):
             print(f"Backend process {pid} is not running.")
@@ -1654,10 +1654,10 @@ MIN_NODE   = (20, 9, 0)
 
 
 def _warn_if_not_on_path():
-    if sys.platform == "win32" and not shutil.which("milli"):  # type: ignore[unreachable]
+    if sys.platform == "win32" and not shutil.which("synapse"):  # type: ignore[unreachable]
         print(  # type: ignore[unreachable]
-            "\nNote: 'milli' is not on your PATH.\n"
-            "You can run Milli with:  python -m milli\n"
+            "\nNote: 'synapse' is not on your PATH.\n"
+            "You can run Synapse with:  python -m synapse\n"
             "To fix permanently, add your Python Scripts folder to PATH.\n",
             file=sys.stderr,
         )
@@ -1670,9 +1670,9 @@ def _warn_versions():
     if py < MIN_PYTHON:
         print(
             f"Warning: Python {py[0]}.{py[1]} detected -- "
-            f"Milli requires Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+.\n"
+            f"Synapse requires Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+.\n"
             "  Please switch to Python 3.11 or newer (https://www.python.org/downloads/)\n"
-            "  and reinstall: pip install milli-ai"
+            "  and reinstall: pip install synapse-ai"
         )
 
     # ── Node.js ───────────────────────────────────────────────────────────────
@@ -1698,7 +1698,7 @@ def _warn_versions():
                 min_str = ".".join(str(x) for x in MIN_NODE)
                 print(
                     f"Warning: Node.js {ver_str} detected -- "
-                    f"Milli requires Node.js {min_str}+.\n"
+                    f"Synapse requires Node.js {min_str}+.\n"
                     f"  Please upgrade from https://nodejs.org/\n"
                     f"  After upgrading, rebuild the frontend:\n"
                     f"    cd {FRONTEND_DIR} && npm install && npm run build"
@@ -1721,7 +1721,7 @@ def main():
     _force_utf8_streams()
     _warn_if_not_on_path()
     _warn_versions()
-    parser = argparse.ArgumentParser(prog="milli", description="Manage Milli server (backend + frontend)")
+    parser = argparse.ArgumentParser(prog="synapse", description="Manage Synapse server (backend + frontend)")
     sub = parser.add_subparsers(dest="cmd")
 
     p_start = sub.add_parser("start", help="Start backend and frontend")
@@ -1729,13 +1729,13 @@ def main():
     p_start.add_argument("--no-browser", action="store_true", help="Do not open a browser on start")
     p_start.add_argument(
         "--backend-port", type=int, default=None, metavar="PORT",
-        help=f"Port for the backend API server (overrides MILLI_BACKEND_PORT env var, default: {DEFAULT_BACKEND_PORT})",
+        help=f"Port for the backend API server (overrides SYNAPSE_BACKEND_PORT env var, default: {DEFAULT_BACKEND_PORT})",
     )
     p_start.add_argument(
         "--frontend-port", type=int, default=None, metavar="PORT",
-        help=f"Port for the frontend web UI (overrides MILLI_FRONTEND_PORT env var, default: {DEFAULT_FRONTEND_PORT})",
+        help=f"Port for the frontend web UI (overrides SYNAPSE_FRONTEND_PORT env var, default: {DEFAULT_FRONTEND_PORT})",
     )
-    p_start.add_argument("--profile", action="store_true", help="Enable performance profiling (sets MILLI_PROFILING=true)")
+    p_start.add_argument("--profile", action="store_true", help="Enable performance profiling (sets SYNAPSE_PROFILING=true)")
 
     sub.add_parser("stop", help="Stop running backend and frontend (reads pidfiles)")
     sub.add_parser("status", help="Show status of backend and frontend")
@@ -1744,13 +1744,13 @@ def main():
     p_restart.add_argument("--detach", "-d", action="store_true", help="After restart, leave processes detached")
     p_restart.add_argument(
         "--backend-port", type=int, default=None, metavar="PORT",
-        help=f"Port for the backend API server (overrides MILLI_BACKEND_PORT env var, default: {DEFAULT_BACKEND_PORT})",
+        help=f"Port for the backend API server (overrides SYNAPSE_BACKEND_PORT env var, default: {DEFAULT_BACKEND_PORT})",
     )
     p_restart.add_argument(
         "--frontend-port", type=int, default=None, metavar="PORT",
-        help=f"Port for the frontend web UI (overrides MILLI_FRONTEND_PORT env var, default: {DEFAULT_FRONTEND_PORT})",
+        help=f"Port for the frontend web UI (overrides SYNAPSE_FRONTEND_PORT env var, default: {DEFAULT_FRONTEND_PORT})",
     )
-    sub.add_parser("setup", help="Run interactive setup wizard to configure Milli")
+    sub.add_parser("setup", help="Run interactive setup wizard to configure Synapse")
 
     # upgrade: pull code and rebuild everything
     sub.add_parser(
@@ -1759,10 +1759,10 @@ def main():
     )
 
     # uninstall: stop + wipe everything
-    p_uninstall = sub.add_parser("uninstall", help="Stop services and remove all Milli AI files")
+    p_uninstall = sub.add_parser("uninstall", help="Stop services and remove all Synapse AI files")
     p_uninstall.add_argument(
         "--keep-data", action="store_true",
-        help="Keep the data directory (~/.milli) when uninstalling",
+        help="Keep the data directory (~/.synapse) when uninstalling",
     )
 
     p_profile = sub.add_parser("profile", help="Query and control backend performance profiling")
@@ -1776,7 +1776,7 @@ def main():
     p_profile.add_argument("--duration", type=int, default=30, metavar="SECS", help="Recording duration in seconds (spy, default: 30)")
 
     # reset-password: reset the UI login password
-    sub.add_parser("reset-password", help="Reset the Milli UI login password")
+    sub.add_parser("reset-password", help="Reset the Synapse UI login password")
 
     # api-keys: manage external API keys
     p_apikeys = sub.add_parser("api-keys", help="Manage API keys for external /api/v1/ access")
@@ -1802,7 +1802,7 @@ def main():
         _stop_command()
     elif args.cmd == "setup":
         try:
-            from milli import setup_wizard
+            from synapse import setup_wizard
             setup_wizard.run()
         except Exception as e:
             print(f"Failed to run setup wizard: {e}")

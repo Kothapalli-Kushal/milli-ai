@@ -933,7 +933,7 @@ export const SettingsView = ({ initialTab = 'general', initialSubTab }: { initia
                     <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
                         <div className="mb-8">
                             <h1 className="text-3xl font-bold mb-2 text-zinc-50">Import / Export</h1>
-                            <p className="text-zinc-500 text-sm">Export your orchestrations, agents, MCP servers, and tools as a portable bundle, or import one from another Synapse instance.</p>
+                            <p className="text-zinc-500 text-sm">Export your orchestrations, agents, MCP servers, and tools as a portable bundle, or import one from another Milli instance.</p>
                         </div>
                         <ImportExportTab defaultView={initialSubTab === 'examples' ? 'examples' : undefined} onImportSuccess={() => dispatch(fetchAllSettingsData())} onNavigate={(tab) => setActiveTab(tab as Tab)} />
                     </div>

@@ -1,4 +1,4 @@
-﻿# PowerShell script to start Milli AI services on Windows
+﻿﻿# PowerShell script to start Synapse AI services on Windows
 # Equivalent to start.sh for cross-platform compatibility
 
 param()

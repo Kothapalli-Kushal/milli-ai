@@ -1,12 +1,12 @@
-﻿# Contributing to Milli
+﻿﻿# Contributing to Synapse
 
 ## Development Setup
 
 **Prerequisites:** Python 3.11+, Node.js 18+, [Ollama](https://ollama.com/) (optional)
 
 ```bash
-git clone https://github.com/synapseorch-ai/milli-ai
-cd milli-ai
+git clone https://github.com/synapseorch-ai/synapse-ai
+cd synapse-ai
 bash setup.sh      # installs all dependencies
 bash start.sh      # starts backend (port 8765) + frontend (port 3000)
 ```
@@ -71,7 +71,7 @@ backend/
                                    OAuth 2.0 PKCE + Bearer token, auto-refresh)
     vault.py                       Auto-saves large tool outputs to disk; resolves @[path] mentions
     models.py                      Pydantic models: ChatRequest, ChatResponse, Agent, DBConfig
-    config.py                      Settings loader — resolves MILLI_DATA_DIR, credentials
+    config.py                      Settings loader — resolves SYNAPSE_DATA_DIR, credentials
     json_store.py                  Thread-safe JSON file persistence with optional TTL cache
     agent_logger.py                Per-run debug logs for agent calls → logs/agent_logs/
     schedule_logger.py             Per-run logs for scheduled executions → logs/schedule_logs/
@@ -130,9 +130,9 @@ backend/
 
 **Frontend ↔ Backend:** The Next.js dev server proxies `/api/*` and `/auth/*` to `http://127.0.0.1:8765` via `next.config.ts` rewrites. Server-side API routes use the `BACKEND_URL` environment variable (default `http://127.0.0.1:8765`).
 
-**MCP Transport:** Local servers use stdio. Remote servers use Streamable HTTP (SSE) with OAuth 2.0 PKCE or Bearer token auth. Milli manages token refresh and session lifecycle automatically.
+**MCP Transport:** Local servers use stdio. Remote servers use Streamable HTTP (SSE) with OAuth 2.0 PKCE or Bearer token auth. Synapse manages token refresh and session lifecycle automatically.
 
-**Data directory:** All user data is stored in `MILLI_DATA_DIR` (default `backend/data/` in dev, `~/.milli/data/` in packaged installs). Never hardcode paths relative to `__file__` — always read from `core.config.DATA_DIR`.
+**Data directory:** All user data is stored in `SYNAPSE_DATA_DIR` (default `backend/data/` in dev, `~/.synapse/data/` in packaged installs). Never hardcode paths relative to `__file__` — always read from `core.config.DATA_DIR`.
 
 ## Adding a Built-in MCP Tool
 

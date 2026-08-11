@@ -26,7 +26,7 @@ class EmbedSetupRequest(BaseModel):
     port: int = 5432
     username: str = "postgres"
     password: str = ""
-    db_name: str = "milli"
+    db_name: str = "synapse"
 
 
 class LoginConfigRequest(BaseModel):

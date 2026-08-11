@@ -32,8 +32,26 @@ class JsonStore:
             if not os.path.exists(self.path):
                 return self.default_factory()
             try:
-                with open(self.path, "r") as f:
-                    data = json.load(f)
+                # Read bytes first so we can tolerate UTF-8/UTF-16 BOM files
+                # created by editors/shell tooling on Windows.
+                with open(self.path, "rb") as f:
+                    raw = f.read()
+
+                if not raw:
+                    return self.default_factory()
+
+                decoded = None
+                for encoding in ("utf-8-sig", "utf-16", "utf-16-le", "utf-16-be"):
+                    try:
+                        decoded = raw.decode(encoding)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+
+                if decoded is None:
+                    decoded = raw.decode("utf-8", errors="replace")
+
+                data = json.loads(decoded.lstrip("\ufeff"))
                 if self._cache_ttl > 0:
                     self._cache = data
                     self._cache_time = now
@@ -43,7 +61,7 @@ class JsonStore:
 
     def save(self, data):
         with self._lock:
-            with open(self.path, "w") as f:
+            with open(self.path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4)
             if self._cache_ttl > 0:
                 self._cache = data

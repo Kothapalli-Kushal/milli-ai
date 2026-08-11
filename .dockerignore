@@ -1,4 +1,4 @@
-﻿backend/venv/
+﻿﻿backend/venv/
 backend/__pycache__/
 backend/data/chroma_db/
 backend/data/vault/
@@ -12,7 +12,7 @@ frontend/.next/
 *.log
 *.pyc
 *.pyo
-milli/_frontend/
+synapse/_frontend/
 frontend-build/
 dist/
 *.egg-info/

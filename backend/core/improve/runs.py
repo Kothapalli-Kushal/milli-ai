@@ -1,5 +1,5 @@
 ﻿"""
-ImprovementRun index for the Milli Self-Improvement subsystem (Checkpoint 3).
+ImprovementRun index for the Synapse Self-Improvement subsystem (Checkpoint 3).
 
 `runs.json` (per-user, see SCHEMA.md §2) holds one record per improvement run:
 

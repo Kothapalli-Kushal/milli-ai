@@ -1,9 +1,9 @@
 ﻿"""
-Performance profiling utilities for the Milli backend.
+Performance profiling utilities for the Synapse backend.
 
 - TimingMiddleware: always-on request latency tracking (adds X-Process-Time header)
-- CPU profiling: on-demand pyinstrument profiler (requires MILLI_PROFILING=true)
-- Memory profiling: on-demand tracemalloc snapshots (requires MILLI_PROFILING=true)
+- CPU profiling: on-demand pyinstrument profiler (requires SYNAPSE_PROFILING=true)
+- Memory profiling: on-demand tracemalloc snapshots (requires SYNAPSE_PROFILING=true)
 """
 
 import os
@@ -16,7 +16,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-PROFILING_ENABLED = os.getenv("MILLI_PROFILING", "false").lower() == "true"
+PROFILING_ENABLED = os.getenv("SYNAPSE_PROFILING", "false").lower() == "true"
 
 # Rolling buffer: endpoint (method + path) → last 1000 latencies in ms
 _timing_stats: dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
@@ -67,13 +67,13 @@ def reset_stats() -> None:
 
 
 # ---------------------------------------------------------------------------
-# CPU profiling (pyinstrument) — only when MILLI_PROFILING=true
+# CPU profiling (pyinstrument) — only when SYNAPSE_PROFILING=true
 # ---------------------------------------------------------------------------
 
 def start_cpu_profiling() -> dict:
     global _cpu_profiler, _cpu_profiling_active
     if not PROFILING_ENABLED:
-        return {"error": "Set MILLI_PROFILING=true to enable CPU profiling"}
+        return {"error": "Set SYNAPSE_PROFILING=true to enable CPU profiling"}
     if _cpu_profiling_active:
         return {"status": "already_running"}
     try:
@@ -89,7 +89,7 @@ def start_cpu_profiling() -> dict:
 def stop_cpu_profiling(output_format: str = "text") -> dict:
     global _cpu_profiler, _cpu_profiling_active
     if not PROFILING_ENABLED:
-        return {"error": "Set MILLI_PROFILING=true to enable CPU profiling"}
+        return {"error": "Set SYNAPSE_PROFILING=true to enable CPU profiling"}
     if not _cpu_profiling_active or _cpu_profiler is None:
         return {"error": "CPU profiling not started"}
     _cpu_profiler.stop()
@@ -109,13 +109,13 @@ def is_cpu_profiling() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Memory profiling (tracemalloc) — only when MILLI_PROFILING=true
+# Memory profiling (tracemalloc) — only when SYNAPSE_PROFILING=true
 # ---------------------------------------------------------------------------
 
 def start_memory_profiling() -> dict:
     global _memory_profiling_active
     if not PROFILING_ENABLED:
-        return {"error": "Set MILLI_PROFILING=true to enable memory profiling"}
+        return {"error": "Set SYNAPSE_PROFILING=true to enable memory profiling"}
     if _memory_profiling_active:
         return {"status": "already_running"}
     tracemalloc.start()
@@ -125,7 +125,7 @@ def start_memory_profiling() -> dict:
 
 def get_memory_snapshot(limit: int = 20) -> dict:
     if not PROFILING_ENABLED:
-        return {"error": "Set MILLI_PROFILING=true to enable memory profiling"}
+        return {"error": "Set SYNAPSE_PROFILING=true to enable memory profiling"}
     if not _memory_profiling_active:
         return {"error": "Memory profiling not started"}
     snapshot = tracemalloc.take_snapshot()

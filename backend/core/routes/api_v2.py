@@ -150,7 +150,7 @@ async def _check_rate_limit(redis, tenant_id: str, max_rps: int) -> None:
         return
     try:
         import time as _time
-        window_key = f"milli:ratelimit:{tenant_id}:{int(_time.time())}"
+        window_key = f"synapse:ratelimit:{tenant_id}:{int(_time.time())}"
         count = await redis.incr(window_key)
         if count == 1:
             await redis.expire(window_key, 2)  # 2s TTL covers the 1s window + lag
@@ -265,7 +265,7 @@ async def v2_run_orchestration(
     cfg = get_scale_config()
 
     tenant_id = body.tenant_id or cfg.default_tenant_id
-    queue_name = f"milli:orchestrations:{tenant_id}" if cfg.enable_tenant_isolation else f"milli:orchestrations:{os.getenv('WORKER_QUEUE_SHARD', 'default')}"
+    queue_name = f"synapse:orchestrations:{tenant_id}" if cfg.enable_tenant_isolation else f"synapse:orchestrations:{os.getenv('WORKER_QUEUE_SHARD', 'default')}"
 
     # Rate limit + quota + backpressure checks
     await _check_rate_limit(redis, tenant_id, cfg.rate_limit_per_tenant_rps)
@@ -434,9 +434,9 @@ async def v2_resume_run(
     run_tenant_id = (run_row.tenant_id or cfg.default_tenant_id)
     print("Resuming run", run_id, "for tenant", run_tenant_id)
     queue_name = (
-        f"milli:orchestrations:{run_tenant_id}"
+        f"synapse:orchestrations:{run_tenant_id}"
         if cfg.enable_tenant_isolation
-        else f"milli:orchestrations:{os.getenv('WORKER_QUEUE_SHARD', 'default')}"
+        else f"synapse:orchestrations:{os.getenv('WORKER_QUEUE_SHARD', 'default')}"
     )
 
     print("Queue name for resume:", queue_name)
@@ -532,7 +532,7 @@ async def v2_chat(
 
     session_id = body.session_id or _new_session_id()
     tenant_id = body.tenant_id or cfg.default_tenant_id
-    queue_name = f"milli:orchestrations:{os.getenv('WORKER_QUEUE_SHARD', 'default')}"
+    queue_name = f"synapse:orchestrations:{os.getenv('WORKER_QUEUE_SHARD', 'default')}"
 
     await arq_redis.enqueue_job(
         "run_agent_chat_job",
@@ -639,7 +639,7 @@ async def v2_cancel_chat(
     """Publish a cancellation signal for a chat session."""
     redis = _require_scale_mode(request)
 
-    await redis.set(f"milli:cancel:chat:{session_id}", "1", ex=3600)
+    await redis.set(f"synapse:cancel:chat:{session_id}", "1", ex=3600)
     return {"status": "cancellation_requested", "session_id": session_id}
 
 
@@ -688,7 +688,7 @@ async def v2_queue_stats(
 
     from core.scale.config import get_scale_config
     cfg = get_scale_config()
-    queue_name = f"milli:orchestrations:{os.getenv('WORKER_QUEUE_SHARD', 'default')}"
+    queue_name = f"synapse:orchestrations:{os.getenv('WORKER_QUEUE_SHARD', 'default')}"
 
     try:
         queued = await redis.zcard(queue_name) or 0

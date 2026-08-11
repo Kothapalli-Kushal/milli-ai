@@ -1,5 +1,5 @@
 ﻿"""
-Milli Self-Improvement subsystem.
+Synapse Self-Improvement subsystem.
 
 Checkpoint 1: trace emission (trace_writer), version model fields, per-user
 storage layout, retention. Later checkpoints add detectors, tuner, versioning,

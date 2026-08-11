@@ -195,7 +195,7 @@ async def reindex_repo(repo_id: str, background_tasks: BackgroundTasks,
             repo["error_message"] = (
                 f"CocoIndex dependency error: {detail}. "
                 f"Install the correct version into the backend venv: "
-                f"pip install 'cocoindex>=0.3.30,<1.0' psycopg, then restart Milli."
+                f"pip install 'cocoindex>=0.3.30,<1.0' psycopg, then restart Synapse."
             )
             save_repos(repos)
             raise HTTPException(

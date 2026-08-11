@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # Built-in commands handled before routing to agent
 _BUILTIN_COMMANDS = {"/start", "/help", "/reset", "/agent", "/agents"}
 
-HELP_TEXT = """? *Milli AI Bot*
+HELP_TEXT = """? *Synapse AI Bot*
 
 Available commands:
 /start -- Show this welcome message

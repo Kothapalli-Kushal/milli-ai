@@ -28,7 +28,7 @@ export const SupportTab = () => {
             answer: (
                 <div className="space-y-2 text-zinc-400">
                     <p>
-                        Synapse supports local models (via Ollama) and cloud providers (OpenAI, Anthropic, Gemini, Groq, etc.).
+                        Milli supports local models (via Ollama) and cloud providers (OpenAI, Anthropic, Gemini, Groq, etc.).
                     </p>
                     <ul className="list-disc pl-5 space-y-1 text-sm">
                         <li>Go to the <Link href="/settings/models" className="text-blue-400 hover:underline">Models tab</Link>.</li>

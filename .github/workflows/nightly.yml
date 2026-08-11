@@ -1,4 +1,4 @@
-﻿name: Nightly (stress + integration)
+﻿﻿name: Nightly (stress + integration)
 
 # The slow suites that are excluded from the deploy gate:
 #   * stress        — many concurrent chats/orchestrations + SSE under the 5-90s
@@ -6,7 +6,7 @@
 #   * integration   — V2 end-to-end against real Redis + Postgres.
 #   * compose-smoke — real docker-compose bring-up (backend + frontend) with a
 #                     live health check — the true "does it install & run" test.
-#   * npm-e2e       — full npm global install + `milli` bootstrap (venv + deps).
+#   * npm-e2e       — full npm global install + `synapse` bootstrap (venv + deps).
 on:
   schedule:
     - cron: '0 3 * * *'   # 03:00 UTC daily
@@ -30,9 +30,9 @@ jobs:
 
       - name: Run stress suite (5-90s fake-LLM latency)
         env:
-          MILLI_STRESS_REPORT_DIR: ${{ github.workspace }}/stress-reports
-          MILLI_STRESS_TOTAL: '40'
-          MILLI_STRESS_CONCURRENCY: '20'
+          SYNAPSE_STRESS_REPORT_DIR: ${{ github.workspace }}/stress-reports
+          SYNAPSE_STRESS_TOTAL: '40'
+          SYNAPSE_STRESS_CONCURRENCY: '20'
         run: |
           python -m pytest backend/tests/stress -m stress -v
 
@@ -63,12 +63,12 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: milli
-          POSTGRES_PASSWORD: milli
-          POSTGRES_DB: milli
+          POSTGRES_USER: synapse
+          POSTGRES_PASSWORD: synapse
+          POSTGRES_DB: synapse
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U milli" --health-interval 5s
+          --health-cmd "pg_isready -U synapse" --health-interval 5s
           --health-timeout 3s --health-retries 10
     steps:
       - uses: actions/checkout@v4
@@ -86,8 +86,8 @@ jobs:
 
       - name: Run V2 integration suite
         env:
-          MILLI_TEST_REDIS_URL: redis://localhost:6379
-          MILLI_TEST_POSTGRES_URL: postgresql+asyncpg://milli:milli@localhost:5432/milli
+          SYNAPSE_TEST_REDIS_URL: redis://localhost:6379
+          SYNAPSE_TEST_POSTGRES_URL: postgresql+asyncpg://synapse:synapse@localhost:5432/synapse
         run: |
           python -m pytest backend/tests/integration -m integration -v
 
@@ -123,7 +123,7 @@ jobs:
           docker compose logs --tail 80 || true
           docker compose down -v || true
 
-  # Full npm path: global install, then `milli` bootstraps a venv + installs
+  # Full npm path: global install, then `synapse` bootstraps a venv + installs
   # backend deps (heavy — hence nightly, not per-PR).
   npm-e2e:
     runs-on: ubuntu-latest
@@ -139,9 +139,9 @@ jobs:
         run: |
           mkdir -p frontend-build && touch frontend-build/.keep
           npm pack
-          npm install -g ./milli-orch-ai-*.tgz
+          npm install -g ./synapse-orch-ai-*.tgz
       - name: Bootstrap the backend env via the launcher
         run: |
-          # `milli setup`/first-run creates the venv and pip-installs deps.
-          timeout 900 milli status || true
-          command -v milli
+          # `synapse setup`/first-run creates the venv and pip-installs deps.
+          timeout 900 synapse status || true
+          command -v synapse

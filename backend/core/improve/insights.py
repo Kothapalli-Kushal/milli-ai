@@ -1,5 +1,5 @@
 ﻿"""
-Insight extraction for the Milli Self-Improvement subsystem (Checkpoint 2).
+Insight extraction for the Synapse Self-Improvement subsystem (Checkpoint 2).
 
 Converts a runner report into ATOMIC learnings — one finding per (trace,
 detector hit) plus aggregate-rate learnings — each carrying evidence pointers
