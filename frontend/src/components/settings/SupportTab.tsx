@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { LifeBuoy, ChevronDown, ChevronRight, ExternalLink, BookOpen, Cpu, GitBranch, Wrench, Server, Key, Database, Code } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, BookOpen, Cpu, GitBranch, Wrench, Server, Key, Database, Code } from 'lucide-react';
 import Link from 'next/link';
 
 export const SupportTab = () => {
@@ -147,33 +147,6 @@ export const SupportTab = () => {
                             <div className="text-[10px] text-zinc-600 mt-0.5">{description}</div>
                         </a>
                     ))}
-                </div>
-            </div>
-
-            {/* Discord Callout */}
-            <div className="space-y-4">
-                <label className="text-xs uppercase font-bold text-zinc-500 tracking-wider">Community</label>
-                <div className="bg-zinc-900 border border-zinc-800 p-4">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <h3 className="text-sm font-bold text-zinc-200 flex items-center gap-2 mb-1">
-                                <LifeBuoy className="h-4 w-4 text-[#5865F2]" />
-                                Join the Community
-                            </h3>
-                            <p className="text-xs text-zinc-600 max-w-xl">
-                                Have questions, need help debugging, or want to share your custom orchestrations? Join our active Discord community to connect with other builders.
-                            </p>
-                        </div>
-                        <a
-                            href="https://discord.gg/9UN45qyGh8"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex shrink-0 items-center gap-2 px-4 py-2 bg-[#5865F2] hover:bg-[#4752C4] text-white text-xs font-bold transition-colors"
-                        >
-                            Join Discord Server
-                            <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                    </div>
                 </div>
             </div>
 

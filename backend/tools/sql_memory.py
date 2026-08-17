@@ -26,7 +26,7 @@ Design invariants, in order of importance:
 - This module NEVER writes to a target database. Target engines are used
   read-only, and only for schema fingerprinting via sys.columns.
 
-Storage is a single SQLite file `{DATA_DIR}/sql_memory.sqlite3` in WAL mode
+Storage is a single SQLite file `{DATA_DIR}/sql_memory_db/sql_memory.sqlite3` in WAL mode
 with per-call connections — all callers dispatch via asyncio.to_thread, so the
 store is entered from arbitrary worker threads (§2).
 """
@@ -88,11 +88,12 @@ CREATE INDEX IF NOT EXISTS ix_memory_subject
 
 
 def db_path() -> str:
-    return os.path.join(DATA_DIR, "sql_memory.sqlite3")
+    return os.path.join(DATA_DIR, "sql_memory_db", "sql_memory.sqlite3")
 
 
 def _connect() -> sqlite3.Connection:
     """Per-call connection — no shared handle across to_thread workers (§2)."""
+    os.makedirs(os.path.dirname(db_path()), exist_ok=True)
     conn = sqlite3.connect(db_path(), timeout=10)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=10000")
